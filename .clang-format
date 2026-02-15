@@ -1,0 +1,33 @@
+BasedOnStyle: LLVM
+AllowShortBlocksOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: true
+  AfterUnion: true
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: true
+ColumnLimit: 100
+IndentWidth: 4
+Standard: Latest
+UseTab: Never
+# Keeps your Matrix header includes organized
+SortIncludes: true
+IncludeCategories:
+  - Regex: '^<.*'
+    Priority: 1
+  - Regex: '.*'
+    Priority: 2
+
