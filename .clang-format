@@ -1,13 +1,11 @@
+# Based on LLVM, but with common "modern" adjustments
 BasedOnStyle: LLVM
-AllowShortBlocksOnASingleLine: true
-AllowShortFunctionsOnASingleLine: Inline
-AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
-AlwaysBreakAfterDefinitionReturnType: None
-AlwaysBreakAfterReturnType: None
-BinPackArguments: true
-BinPackParameters: true
-BreakBeforeBraces: Attach
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AllowShortFunctionsOnASingleLine: Empty
+BreakBeforeBraces: Custom
 BraceWrapping:
   AfterClass: false
   AfterControlStatement: Never

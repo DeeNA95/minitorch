@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cuda_runtime.h>
 #include <iostream>
+#include <random>
 #include "minitorch/matrix.cuh"
 
 using namespace minitorch;
@@ -92,4 +93,19 @@ Matrix &Matrix::operator=(Matrix &&other) noexcept {
         other.cols = 0;
     }
     return *this;
+}
+
+// random fill
+void Matrix::rand_fill(float low, float high) {
+    float *buffer = new float[Matrix::getcols() * Matrix::getrows()];
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(low, high);
+
+    for (int i = 0; i < Matrix::getcols() * Matrix::getrows(); i++) { buffer[i] = dist(gen); }
+
+    Matrix::to_device(buffer);
+
+    delete[] buffer;
 }
