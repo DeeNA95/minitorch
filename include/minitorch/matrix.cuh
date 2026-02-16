@@ -4,12 +4,12 @@ namespace minitorch {
 
 class Matrix {
 
-private:
+  private:
     float *data;
     int rows;
     int cols;
 
-public:
+  public:
     // constructor
     Matrix(int rows, int cols);
     // Destructor
@@ -38,5 +38,7 @@ public:
     int getrows() const;
     int getcols() const;
     float *getdata() const;
+
+    void rand_fill(float low, float high);
 };
 } // namespace minitorch

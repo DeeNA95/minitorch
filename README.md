@@ -29,11 +29,11 @@ A neural network framework built from scratch in C++ & CUDA.
 
 ### Phase 3a — Forward Pass: Making Predictions
 
-- [ ] `Linear` layer forward (matmul + bias)
-- [ ] `sigmoid_forward` kernel
-- [ ] `relu_forward` kernel
-- [ ] Manual weight setting from CPU
-- [ ] **Deliverable**: Forward pass with known weights matches hand-calculated values
+- [-] `Linear` layer forward (matmul + bias)
+- [-] `sigmoid_forward` kernel
+- [-] `relu_forward` kernel
+- [-] Manual weight setting from CPU
+- [-] **Deliverable**: Forward pass with known weights matches hand-calculated values
 
 ### Phase 3b — Backward Pass: Learning from Mistakes
 
