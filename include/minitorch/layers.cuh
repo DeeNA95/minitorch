@@ -1,3 +1,4 @@
+#pragma once
 #include <cuda_runtime.h>
 #include <string>
 #include "minitorch/matrix.cuh"
@@ -6,12 +7,12 @@
 namespace minitorch {
 
 class Linear {
-  private:
+private:
     int n_weights;
     Matrix weights;
     Matrix bias;
 
-  public:
+public:
     Linear(int in_features, int out_features);
     ~Linear();
 
