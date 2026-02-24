@@ -4,12 +4,12 @@ namespace minitorch {
 
 class Matrix {
 
-  private:
+private:
     float *data;
     int rows;
     int cols;
 
-  public:
+public:
     // constructor
     Matrix(int rows, int cols);
     // Destructor
@@ -21,6 +21,7 @@ class Matrix {
     // deleting copy constructor to prevent copy accidents
     Matrix(const Matrix &) = delete;
     Matrix &operator=(const Matrix &) = delete;
+    Matrix copy() const;
 
     // get item
     // float &at(int r, int c);

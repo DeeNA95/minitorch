@@ -11,14 +11,20 @@ private:
     int n_weights;
     Matrix weights;
     Matrix bias;
+    Matrix grad_weights; // gradients for weights
+    Matrix grad_bias;
+    Matrix input_cache;
 
 public:
     Linear(int in_features, int out_features);
     ~Linear();
 
-    Matrix forward(const Matrix &inputs, std::string act_fn);
-    Matrix &get_weights() const;
-    Matrix &get_bias() const;
+    Matrix forward(const Matrix &inputs);
+    Matrix backward(Matrix &grad_outputs);
+    Matrix &get_weights();
+    Matrix &get_bias();
+    const Matrix &get_grad_weights() const;
+    const Matrix &get_grad_bias() const;
     void fix_weights();
 };
 
