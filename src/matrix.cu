@@ -95,15 +95,28 @@ Matrix &Matrix::operator=(Matrix &&other) noexcept {
     return *this;
 }
 
+// copy
+Matrix Matrix::copy() const {
+    int rows = this->rows, cols = this->cols;
+
+    Matrix out = Matrix(rows, cols);
+    // this refers to the current matrix as it is a memeber function
+    cudaMemcpy(out.data, this->data, (std::size_t)(sizeof(float) * rows * cols),
+               cudaMemcpyDeviceToDevice);
+    return out;
+}
+
 // random fill
-void Matrix::rand_fill(float low, float high) {
+void Matrix::rand_fill(float low, float high) { // move to kernel
     float *buffer = new float[Matrix::getcols() * Matrix::getrows()];
 
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist(low, high);
 
-    for (int i = 0; i < Matrix::getcols() * Matrix::getrows(); i++) { buffer[i] = dist(gen); }
+    for (int i = 0; i < Matrix::getcols() * Matrix::getrows(); i++) {
+        buffer[i] = dist(gen);
+    }
 
     Matrix::to_device(buffer);
 
