@@ -4,8 +4,7 @@ import numpy as np
 import pandas as pd
 
 df = pd.read_csv("data/sales.tsv", sep="\t", header=None)
-df = df[:-1]
-
+df = df.dropna()
 print(df.head())
 df["date"] = pd.to_datetime(df[2])
 df["product_encoded"], ne = pd.factorize(df[0])
