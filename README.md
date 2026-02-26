@@ -37,14 +37,14 @@ A neural network framework built from scratch in C++ & CUDA.
 
 ### Phase 3b — Backward Pass: Learning from Mistakes
 
-- [ ] `Linear::backward()` — gradient w.r.t. input, weights, bias
-- [ ] `sigmoid_backward` kernel
-- [ ] `relu_backward` kernel
-- [ ] MSE loss (forward + backward)
-- [ ] SGD optimizer
-- [ ] Gradient checking with finite differences
-- [ ] **Deliverable**: Train XOR — loss → ~0, predictions match truth table
-- [ ] **Benchmark**: XOR training speed vs PyTorch
+- [-] `Linear::backward()` — gradient w.r.t. input, weights, bias
+- [-] `sigmoid_backward` kernel
+- [-] `relu_backward` kernel
+- [-] MSE loss (forward + backward)
+- [-] SGD optimizer
+- [-] Gradient checking with finite differences
+- [-] **Deliverable**: Train XOR — loss → ~0, predictions match truth table
+- [-] **Benchmark**: XOR training speed vs PyTorch
 
 ### Phase 4 — Real Data: sales.tsv Regression
 

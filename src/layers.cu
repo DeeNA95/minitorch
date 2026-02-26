@@ -14,8 +14,8 @@ Linear::Linear(int in_features, int out_features)
       bias(1, out_features), grad_weights(in_features, out_features), grad_bias(1, out_features),
       input_cache(1, 1) /* will be overwritten by move op*/ {
 
-    Linear::weights.rand_fill(-5, 5);
-    Linear::bias.rand_fill(-1, 1);
+    Linear::weights.rand_fill(-0.01f, 0.01f);
+    Linear::bias.rand_fill(-0.01f, 0.01f);
 }
 
 Linear::~Linear() {
