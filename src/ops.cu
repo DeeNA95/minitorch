@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include "minitorch/matrix.cuh"
 #include "minitorch/ops.cuh"
+#include "minitorch/utils.cuh"
 
 using namespace minitorch;
 
@@ -13,10 +14,10 @@ void __global__ matrix_add(const float *__restrict__ a, const float *__restrict_
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    if (x >= n_cols || y >= n_rows) return;
+    if (x >= n_cols || y >= n_rows)
+        return;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] + b[idx(y, x)];
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] + b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_add(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -45,10 +46,10 @@ void __global__ bias_add(const float *__restrict__ a, const float *__restrict__ 
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    if (x >= n_cols || y >= n_rows) return;
+    if (x >= n_cols || y >= n_rows)
+        return;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] + b[x];
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] + b[x];
 }
 
 void b_add(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -75,9 +76,9 @@ void __global__ matrix_sub(const float *__restrict__ a, const float *__restrict_
                            int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] - b[idx(y, x)];
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] - b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_sub(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -105,9 +106,9 @@ void __global__ matrix_elem_mul(const float *__restrict__ a, const float *__rest
                                 int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] * b[idx(y, x)];
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] * b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_elem_mul(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -135,9 +136,9 @@ void __global__ matrix_scalar_mul(const float *__restrict__ a, const float b, fl
                                   int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] * b;
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] * b;
 }
 
 void mat_scalar_mul(const Matrix &A, float B, Matrix &C) {
@@ -159,9 +160,9 @@ void mat_scalar_mul(const Matrix &A, float B, Matrix &C) {
 void __global__ matrix_transpose(const float *A, float *C, int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    // auto idx_a = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    // auto idx_c = [&n_rows](int x, int y) { return (x * n_rows + y); };
+    if (x >= n_cols || y >= n_rows)
+        return;
+
     C[x * n_rows + y] = A[y * n_cols + x];
 }
 
@@ -184,16 +185,17 @@ void __global__ matrix_matmul(const float *__restrict__ A, const float *__restri
     int x = threadIdx.x + blockDim.x * blockIdx.x; // col index
     int y = threadIdx.y + blockDim.y * blockIdx.y; // row index
 
-    auto idx = [&b_cols](int y, int x) { return (y * b_cols + x); };
     float sum = 0.0f;
-    if (x >= b_cols || y >= a_rows) { return; }
+    if (x >= b_cols || y >= a_rows) {
+        return;
+    }
     // A has row number A_rows and col number b_rows hence a stride is b_rows
     // B has row number b_rows and col number b_cols hence b stride is b_cols
 
     for (int i = 0; i < b_rows; i++) { // total stride is b_rows as that is shared dim
         sum += A[y * b_rows + i] * B[i * b_cols + x];
     };
-    C[idx(y, x)] = sum;
+    C[get_idx_2d(y, x, b_cols)] = sum;
 }
 
 Matrix mat_matmul(const Matrix &A, const Matrix &B) {

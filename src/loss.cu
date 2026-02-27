@@ -4,6 +4,7 @@
 #include "cooperative_groups.h"
 #include "cooperative_groups/reduce.h"
 #include "minitorch/loss.cuh"
+#include "minitorch/utils.cuh"
 
 namespace cg = cooperative_groups;
 
@@ -81,12 +82,11 @@ __global__ void ker_mse_backward(const float *__restrict__ preds, const float *_
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    auto idx = [&n_cols](int x, int y) { return (y * n_cols + x); };
-
     if (x >= n_cols || y >= n / n_cols)
         return;
 
-    derivs[idx(y, x)] = (2.0f / n) * (preds[idx(y, x)] - actuals[idx(y, x)]);
+    derivs[get_idx_2d(y, x, n_cols)] =
+        (2.0f / n) * (preds[get_idx_2d(y, x, n_cols)] - actuals[get_idx_2d(y, x, n_cols)]);
 }
 
 Matrix mse_backward(Matrix &preds, Matrix &actual) {

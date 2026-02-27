@@ -41,5 +41,8 @@ public:
     float *getdata() const;
 
     void rand_fill(float low, float high);
+
+    // for mini-batches, takes a `list` of indices and a start index and batchsize
+    Matrix extract_batch(int *d_indices, int start_idx, int batch_size) const;
 };
 } // namespace minitorch

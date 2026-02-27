@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include "minitorch/activations.cuh"
+#include "minitorch/utils.cuh"
 
 using namespace minitorch;
 // for forward pass, INPUT goes in and OUTPUT goes out
@@ -13,8 +14,7 @@ __global__ void ker_sigmoid_forward(float *__restrict__ w, int n_cols) {
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
     // obtain matrix cell and run sigmoid_forward on it
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    w[idx(y, x)] = (1 / (1 + expf(-w[idx(y, x)])));
+    w[get_idx_2d(y, x, n_cols)] = (1 / (1 + expf(-w[get_idx_2d(y, x, n_cols)])));
 }
 
 void sigmoid_forward(Matrix &weights) {
@@ -33,12 +33,12 @@ __global__ void ker_sigmoid_backward(const float *__restrict__ grad_mat,
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-
     if (x >= n_cols || y >= n_rows)
         return;
 
-    grads_in[idx(y, x)] = grad_mat[idx(y, x)] * out[idx(y, x)] * (1.0f - out[idx(y, x)]);
+    grads_in[get_idx_2d(y, x, n_cols)] = grad_mat[get_idx_2d(y, x, n_cols)] *
+                                         out[get_idx_2d(y, x, n_cols)] *
+                                         (1.0f - out[get_idx_2d(y, x, n_cols)]);
 }
 
 Matrix sigmoid_backward(Matrix &grad_mat, Matrix &out) {
@@ -63,8 +63,7 @@ __global__ void ker_relu_forward(float *__restrict__ w, int n_cols) {
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
     // obtain matrix cell and run relu_forward on it
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    w[idx(y, x)] = max(0.0f, w[idx(y, x)]);
+    w[get_idx_2d(y, x, n_cols)] = max(0.0f, w[get_idx_2d(y, x, n_cols)]);
 }
 
 void relu_forward(Matrix &weights) {
@@ -83,12 +82,11 @@ __global__ void ker_relu_backward(const float *__restrict__ grad_mat,
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-
     if (x >= n_cols || y >= n_rows)
         return;
 
-    grads_in[idx(y, x)] = (relu_in[idx(y, x)] > 0.0f) ? grad_mat[idx(y, x)] : 0.0f;
+    grads_in[get_idx_2d(y, x, n_cols)] =
+        (relu_in[get_idx_2d(y, x, n_cols)] > 0.0f) ? grad_mat[get_idx_2d(y, x, n_cols)] : 0.0f;
 }
 
 Matrix relu_backward(Matrix &grad_mat, Matrix &relu_in) {

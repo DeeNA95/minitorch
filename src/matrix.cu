@@ -3,20 +3,52 @@
 #include <iostream>
 #include <random>
 #include "minitorch/matrix.cuh"
-
+#include "minitorch/utils.cuh"
 using namespace minitorch;
 
+/* KERNELS */
+
+// fills matrix
 __global__ void fill_mat(float *data, float value, int n_cols, int n_rows) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
     if (x < n_cols && y < n_rows) {
-        data[idx(y, x)] = value;
+        data[get_idx_2d(y, x, n_cols)] = value;
     } else
         return;
 }
 
+// extract_batch
+__global__ void ker_extract_batch(const float *source, float *dest, const int *indices,
+                                  int start_idx, int batch_size, int num_cols) {
+    int i = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if (i >= batch_size * num_cols)
+        return;
+
+    int dest_row = i / num_cols, dest_col = i % num_cols;
+
+    auto orig_row = indices[start_idx + dest_row];
+
+    dest[i] = source[orig_row * num_cols + dest_col];
+}
+
+/* CLASS MEMBER FUNCTIONS */
+
+Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) const {
+    Matrix mini_batch(batch_size, this->cols);
+    int tot_elems = batch_size * this->cols;
+    int threads = 256;
+    int blocks = (tot_elems + 255) / 256;
+
+    ker_extract_batch<<<blocks, threads>>>(this->data, mini_batch.getdata(), d_indices, start_idx,
+                                           batch_size, this->cols);
+
+    return mini_batch;
+}
+
+// constructor
 Matrix::Matrix(int row, int col) : rows(row), cols(col) {
     std::size_t bytes_size = sizeof(float) * row * col;
     cudaMalloc(&data, bytes_size);
