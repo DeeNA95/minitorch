@@ -43,7 +43,7 @@ Matrix Linear::forward(const Matrix &inputs /*, std::string act_fn*/) {
     return output;
 }
 
-Matrix Linear::backward(Matrix &grad_output) {
+Matrix Linear::backward(const Matrix &grad_output) {
     // takes grads from upper layer and computes 3 things
     // -grad_weights the error attributable to weight
     // -grad_inputs
@@ -60,7 +60,7 @@ Matrix Linear::backward(Matrix &grad_output) {
 
     // grad_bias should be the sum of grad_ouput along rows to each batch, but since we are
     // currently batchless its just equal to grad_output,
-    this->grad_bias = std::move(grad_output);
+    this->grad_bias = grad_output.copy();
 
     return grad_inputs;
 }
@@ -92,8 +92,13 @@ void Linear::fix_weights() {
 }
 
 //
+//
 Matrix &Linear::get_weights() {
     return weights;
+}
+
+std::vector<Matrix *> Linear::parameters() {
+    return {&weights, &bias};
 }
 //
 Matrix &Linear::get_bias() {

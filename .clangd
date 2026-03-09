@@ -1,0 +1,6 @@
+CompileFlags:
+  Add:
+    - "-xcuda"
+    - "--no-cuda-version-check"
+    - "--cuda-host-only"
+    - "-nocudalib"

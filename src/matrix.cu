@@ -3,6 +3,7 @@
 #include <iostream>
 #include <random>
 #include "minitorch/matrix.cuh"
+#include "minitorch/memory_pool.cuh"
 #include "minitorch/utils.cuh"
 using namespace minitorch;
 
@@ -36,26 +37,17 @@ __global__ void ker_extract_batch(const float *source, float *dest, const int *i
 
 /* CLASS MEMBER FUNCTIONS */
 
-Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) const {
-    Matrix mini_batch(batch_size, this->cols);
-    int tot_elems = batch_size * this->cols;
-    int threads = 256;
-    int blocks = (tot_elems + 255) / 256;
-
-    ker_extract_batch<<<blocks, threads>>>(this->data, mini_batch.getdata(), d_indices, start_idx,
-                                           batch_size, this->cols);
-
-    return mini_batch;
-}
-
 // constructor
 Matrix::Matrix(int row, int col) : rows(row), cols(col) {
     std::size_t bytes_size = sizeof(float) * row * col;
-    cudaMalloc(&data, bytes_size);
+    // cudaMalloc(&data, bytes_size);
+    data = MemoryPool::instance().allocate(bytes_size);
 }
 
 Matrix::~Matrix() {
-    cudaFree(data);
+    // cudaFree(data);
+    if (data)
+        MemoryPool::instance().deallocate(data, sizeof(float) * rows * cols);
 }
 
 int Matrix::getrows() const {
@@ -115,7 +107,10 @@ Matrix::Matrix(Matrix &&other) noexcept {
 
 Matrix &Matrix::operator=(Matrix &&other) noexcept {
     if (this != &other) {
-        cudaFree(data);
+        // cudaFree(data);
+
+        if (data)
+            MemoryPool::instance().deallocate(data, sizeof(float) * rows * cols);
         data = other.data;
         rows = other.rows;
         cols = other.cols;
@@ -135,6 +130,7 @@ Matrix Matrix::copy() const {
     // this refers to the current matrix as it is a memeber function
     cudaMemcpy(out.data, this->data, (std::size_t)(sizeof(float) * rows * cols),
                cudaMemcpyDeviceToDevice);
+
     return out;
 }
 
@@ -153,4 +149,16 @@ void Matrix::rand_fill(float low, float high) { // move to kernel
     Matrix::to_device(buffer);
 
     delete[] buffer;
+}
+
+Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) const {
+    Matrix mini_batch(batch_size, this->cols);
+    int tot_elems = batch_size * this->cols;
+    int threads = 256;
+    int blocks = (tot_elems + 255) / 256;
+
+    ker_extract_batch<<<blocks, threads>>>(this->data, mini_batch.getdata(), d_indices, start_idx,
+                                           batch_size, this->cols);
+
+    return mini_batch;
 }

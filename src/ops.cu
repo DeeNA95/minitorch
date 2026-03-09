@@ -3,6 +3,7 @@
 #include "minitorch/matrix.cuh"
 #include "minitorch/ops.cuh"
 #include "minitorch/utils.cuh"
+#define TILE_SIZE 16
 
 using namespace minitorch;
 
@@ -182,20 +183,45 @@ Matrix mat_transpose(Matrix &A) {
 
 void __global__ matrix_matmul(const float *__restrict__ A, const float *__restrict__ B, float *C,
                               int a_rows, int b_rows, int b_cols) {
-    int x = threadIdx.x + blockDim.x * blockIdx.x; // col index
-    int y = threadIdx.y + blockDim.y * blockIdx.y; // row index
+
+    __shared__ float tile_a[TILE_SIZE][TILE_SIZE], tile_b[TILE_SIZE][TILE_SIZE];
+
+    int x = threadIdx.x + blockDim.x * blockIdx.x;    // global col index
+    int y = threadIdx.y + blockDim.y * blockIdx.y;    // row index
+    int x_local = threadIdx.x, y_local = threadIdx.y; // local index
 
     float sum = 0.0f;
+
+    // A has row number A_rows and col number b_rows hence a stride is b_rows
+    // B has row number b_rows and col number b_cols hence b stride is b_cols
+    //
+    // fill the shared mem tiles
+    for (int i = 0; i < (b_rows + TILE_SIZE - 1) / TILE_SIZE; i++) {
+        if (i * TILE_SIZE + x_local >= b_rows) {
+            tile_a[y_local][x_local] = 0.0f;
+            tile_b[y_local][x_local] = 0.0f;
+        } else {
+            tile_a[y_local][x_local] = A[y * b_rows + (i * TILE_SIZE + x_local)];
+            tile_b[y_local][x_local] = B[(i * TILE_SIZE + y_local) * b_cols + x];
+        }
+        __syncthreads();
+        for (int j = 0; j < TILE_SIZE; j++) {
+            sum += tile_a[y_local][j] * tile_b[j][x_local];
+        }
+        __syncthreads();
+    }
     if (x >= b_cols || y >= a_rows) {
         return;
     }
-    // A has row number A_rows and col number b_rows hence a stride is b_rows
-    // B has row number b_rows and col number b_cols hence b stride is b_cols
+    C[y * b_cols + x] = sum;
 
-    for (int i = 0; i < b_rows; i++) { // total stride is b_rows as that is shared dim
+    /*
+     *NAIVE AND UNOPTIMISED.
+     * for (int i = 0; i < b_rows; i++) { // total stride is b_rows as that is shared dim
         sum += A[y * b_rows + i] * B[i * b_cols + x];
     };
     C[get_idx_2d(y, x, b_cols)] = sum;
+    */
 }
 
 Matrix mat_matmul(const Matrix &A, const Matrix &B) {
@@ -208,7 +234,7 @@ Matrix mat_matmul(const Matrix &A, const Matrix &B) {
            "Number of columns in matrix A must be equal to number of rows in Matrix B");
 
     Matrix C = Matrix(a_rows, b_cols);
-    dim3 threads(16, 16, 1);
+    dim3 threads(TILE_SIZE, TILE_SIZE, 1);
     dim3 blocks((b_cols + threads.x - 1) / threads.x, (a_rows + threads.y - 1) / threads.y, 1);
 
     matrix_matmul<<<blocks, threads>>>(A.getdata(), B.getdata(), C.getdata(), a_rows, b_rows,
