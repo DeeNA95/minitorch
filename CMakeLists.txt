@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(src)
 add_subdirectory(tests)
+add_subdirectory(demos)
 
 # 1. Include CMake's built-in package helper module
 include(CMakePackageConfigHelpers)

@@ -5,7 +5,7 @@ DEST=~/minitorch
 sync:
 	rsync -avzP --exclude='.git/' --exclude='build/' --exclude='data/' ./ $(VM):$(DEST)/
 sync3090:
-	rsync -avzP --exclude='.git/' --exclude='build/'  ./ vast-3090:$(DEST)/
+	rsync -avzP --exclude='.git/' --exclude='build/'  ./ vast-chess:$(DEST)/
 # sync:
 # 	rsync -avzP --rsync-path=/usr/bin/rsync --exclude='.git/' --exclude='build/' ./ $(VM):$(DEST)/
 #

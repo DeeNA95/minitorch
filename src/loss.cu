@@ -110,4 +110,5 @@ Matrix mse_backward(Matrix &preds, Matrix &actual) {
 
     return derivs;
 }
+
 } // namespace minitorch
