@@ -22,7 +22,7 @@ public:
 
     Matrix forward(const Matrix &inputs) override;
     Matrix backward(const Matrix &grad_outputs) override;
-    std::vector<Matrix *> parameters() override;
+    std::vector<Parameter> parameters() override;
     Matrix &get_weights();
     Matrix &get_bias();
     const Matrix &get_grad_weights() const;

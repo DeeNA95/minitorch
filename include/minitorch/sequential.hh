@@ -35,8 +35,8 @@ public:
         return current_grad;
     }
 
-    std::vector<Matrix *> parameters() override {
-        std::vector<Matrix *> params;
+    std::vector<Parameter> parameters() override {
+        std::vector<Parameter> params;
         for (auto layer : layers) {
             auto layer_params = layer->parameters();
             params.insert(params.end(), layer_params.begin(), layer_params.end());
