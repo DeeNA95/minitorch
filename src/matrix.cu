@@ -3,27 +3,51 @@
 #include <iostream>
 #include <random>
 #include "minitorch/matrix.cuh"
-
+#include "minitorch/memory_pool.cuh"
+#include "minitorch/utils.cuh"
 using namespace minitorch;
 
+/* KERNELS */
+
+// fills matrix
 __global__ void fill_mat(float *data, float value, int n_cols, int n_rows) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
     if (x < n_cols && y < n_rows) {
-        data[idx(y, x)] = value;
+        data[get_idx_2d(y, x, n_cols)] = value;
     } else
         return;
 }
 
+// extract_batch
+__global__ void ker_extract_batch(const float *source, float *dest, const int *indices,
+                                  int start_idx, int batch_size, int num_cols) {
+    int i = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if (i >= batch_size * num_cols)
+        return;
+
+    int dest_row = i / num_cols, dest_col = i % num_cols;
+
+    auto orig_row = indices[start_idx + dest_row];
+
+    dest[i] = source[orig_row * num_cols + dest_col];
+}
+
+/* CLASS MEMBER FUNCTIONS */
+
+// constructor
 Matrix::Matrix(int row, int col) : rows(row), cols(col) {
     std::size_t bytes_size = sizeof(float) * row * col;
-    cudaMalloc(&data, bytes_size);
+    // cudaMalloc(&data, bytes_size);
+    data = MemoryPool::instance().allocate(bytes_size);
 }
 
 Matrix::~Matrix() {
-    cudaFree(data);
+    // cudaFree(data);
+    if (data)
+        MemoryPool::instance().deallocate(data, sizeof(float) * rows * cols);
 }
 
 int Matrix::getrows() const {
@@ -83,7 +107,10 @@ Matrix::Matrix(Matrix &&other) noexcept {
 
 Matrix &Matrix::operator=(Matrix &&other) noexcept {
     if (this != &other) {
-        cudaFree(data);
+        // cudaFree(data);
+
+        if (data)
+            MemoryPool::instance().deallocate(data, sizeof(float) * rows * cols);
         data = other.data;
         rows = other.rows;
         cols = other.cols;
@@ -103,6 +130,7 @@ Matrix Matrix::copy() const {
     // this refers to the current matrix as it is a memeber function
     cudaMemcpy(out.data, this->data, (std::size_t)(sizeof(float) * rows * cols),
                cudaMemcpyDeviceToDevice);
+
     return out;
 }
 
@@ -121,4 +149,16 @@ void Matrix::rand_fill(float low, float high) { // move to kernel
     Matrix::to_device(buffer);
 
     delete[] buffer;
+}
+
+Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) const {
+    Matrix mini_batch(batch_size, this->cols);
+    int tot_elems = batch_size * this->cols;
+    int threads = 256;
+    int blocks = (tot_elems + 255) / 256;
+
+    ker_extract_batch<<<blocks, threads>>>(this->data, mini_batch.getdata(), d_indices, start_idx,
+                                           batch_size, this->cols);
+
+    return mini_batch;
 }

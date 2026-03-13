@@ -2,6 +2,8 @@
 #include <cuda_runtime.h>
 #include "minitorch/matrix.cuh"
 #include "minitorch/ops.cuh"
+#include "minitorch/utils.cuh"
+#define TILE_SIZE 16
 
 using namespace minitorch;
 
@@ -13,10 +15,10 @@ void __global__ matrix_add(const float *__restrict__ a, const float *__restrict_
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    if (x >= n_cols || y >= n_rows) return;
+    if (x >= n_cols || y >= n_rows)
+        return;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] + b[idx(y, x)];
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] + b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_add(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -45,10 +47,10 @@ void __global__ bias_add(const float *__restrict__ a, const float *__restrict__ 
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-    if (x >= n_cols || y >= n_rows) return;
+    if (x >= n_cols || y >= n_rows)
+        return;
 
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] + b[x];
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] + b[x];
 }
 
 void b_add(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -75,9 +77,9 @@ void __global__ matrix_sub(const float *__restrict__ a, const float *__restrict_
                            int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] - b[idx(y, x)];
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] - b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_sub(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -105,9 +107,9 @@ void __global__ matrix_elem_mul(const float *__restrict__ a, const float *__rest
                                 int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] * b[idx(y, x)];
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] * b[get_idx_2d(y, x, n_cols)];
 }
 
 void mat_elem_mul(const Matrix &A, const Matrix &B, Matrix &C) {
@@ -135,9 +137,9 @@ void __global__ matrix_scalar_mul(const float *__restrict__ a, const float b, fl
                                   int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    auto idx = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    c[idx(y, x)] = a[idx(y, x)] * b;
+    if (x >= n_cols || y >= n_rows)
+        return;
+    c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] * b;
 }
 
 void mat_scalar_mul(const Matrix &A, float B, Matrix &C) {
@@ -159,9 +161,9 @@ void mat_scalar_mul(const Matrix &A, float B, Matrix &C) {
 void __global__ matrix_transpose(const float *A, float *C, int n_cols, int n_rows) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
-    if (x >= n_cols || y >= n_rows) return;
-    // auto idx_a = [&n_cols](int y, int x) { return (y * n_cols + x); };
-    // auto idx_c = [&n_rows](int x, int y) { return (x * n_rows + y); };
+    if (x >= n_cols || y >= n_rows)
+        return;
+
     C[x * n_rows + y] = A[y * n_cols + x];
 }
 
@@ -181,19 +183,45 @@ Matrix mat_transpose(Matrix &A) {
 
 void __global__ matrix_matmul(const float *__restrict__ A, const float *__restrict__ B, float *C,
                               int a_rows, int b_rows, int b_cols) {
-    int x = threadIdx.x + blockDim.x * blockIdx.x; // col index
-    int y = threadIdx.y + blockDim.y * blockIdx.y; // row index
 
-    auto idx = [&b_cols](int y, int x) { return (y * b_cols + x); };
+    __shared__ float tile_a[TILE_SIZE][TILE_SIZE], tile_b[TILE_SIZE][TILE_SIZE];
+
+    int x = threadIdx.x + blockDim.x * blockIdx.x;    // global col index
+    int y = threadIdx.y + blockDim.y * blockIdx.y;    // row index
+    int x_local = threadIdx.x, y_local = threadIdx.y; // local index
+
     float sum = 0.0f;
-    if (x >= b_cols || y >= a_rows) { return; }
+
     // A has row number A_rows and col number b_rows hence a stride is b_rows
     // B has row number b_rows and col number b_cols hence b stride is b_cols
+    //
+    // fill the shared mem tiles
+    for (int i = 0; i < (b_rows + TILE_SIZE - 1) / TILE_SIZE; i++) {
+        if (i * TILE_SIZE + x_local >= b_rows) {
+            tile_a[y_local][x_local] = 0.0f;
+            tile_b[y_local][x_local] = 0.0f;
+        } else {
+            tile_a[y_local][x_local] = A[y * b_rows + (i * TILE_SIZE + x_local)];
+            tile_b[y_local][x_local] = B[(i * TILE_SIZE + y_local) * b_cols + x];
+        }
+        __syncthreads();
+        for (int j = 0; j < TILE_SIZE; j++) {
+            sum += tile_a[y_local][j] * tile_b[j][x_local];
+        }
+        __syncthreads();
+    }
+    if (x >= b_cols || y >= a_rows) {
+        return;
+    }
+    C[y * b_cols + x] = sum;
 
-    for (int i = 0; i < b_rows; i++) { // total stride is b_rows as that is shared dim
+    /*
+     *NAIVE AND UNOPTIMISED.
+     * for (int i = 0; i < b_rows; i++) { // total stride is b_rows as that is shared dim
         sum += A[y * b_rows + i] * B[i * b_cols + x];
     };
-    C[idx(y, x)] = sum;
+    C[get_idx_2d(y, x, b_cols)] = sum;
+    */
 }
 
 Matrix mat_matmul(const Matrix &A, const Matrix &B) {
@@ -206,7 +234,7 @@ Matrix mat_matmul(const Matrix &A, const Matrix &B) {
            "Number of columns in matrix A must be equal to number of rows in Matrix B");
 
     Matrix C = Matrix(a_rows, b_cols);
-    dim3 threads(16, 16, 1);
+    dim3 threads(TILE_SIZE, TILE_SIZE, 1);
     dim3 blocks((b_cols + threads.x - 1) / threads.x, (a_rows + threads.y - 1) / threads.y, 1);
 
     matrix_matmul<<<blocks, threads>>>(A.getdata(), B.getdata(), C.getdata(), a_rows, b_rows,

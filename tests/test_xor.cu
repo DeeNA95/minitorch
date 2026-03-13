@@ -48,17 +48,17 @@ int main(int argc, char *argv[]) {
 
     // network
     Linear l1 = Linear(2, 4);
+    Sigmoid sig1;
     Linear l2 = Linear(4, 1);
+    Sigmoid sig2;
     float loss;
 
     for (int epoch = 0; epoch < epochs; epoch++) {
         // forward
         Matrix out1 = l1.forward(input);
-        Matrix a1 = out1.copy();
-        sigmoid_forward(a1);
+        Matrix a1 = sig1.forward(out1);
         Matrix out2 = l2.forward(a1);
-        Matrix a2 = out2.copy();
-        sigmoid_forward(a2);
+        Matrix a2 = sig2.forward(out2);
 
         // loss this just for printing the one that goes into the backward is handled in
         // mse_backward
@@ -68,9 +68,9 @@ int main(int argc, char *argv[]) {
         }
         // backward
         Matrix mse_back = mse_backward(a2, target);
-        Matrix a2_back = sigmoid_backward(mse_back, a2);
+        Matrix a2_back = sig2.backward(mse_back);
         Matrix l2_back = l2.backward(a2_back);
-        Matrix a1_back = sigmoid_backward(l2_back, a1);
+        Matrix a1_back = sig1.backward(l2_back);
         Matrix l1_back = l1.backward(a1_back);
 
         // update weights

@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(src)
 add_subdirectory(tests)
+add_subdirectory(demos)
 
 # 1. Include CMake's built-in package helper module
 include(CMakePackageConfigHelpers)
@@ -30,7 +31,7 @@ install(
 file(
   WRITE ${CMAKE_CURRENT_BINARY_DIR}/minitorchlibConfig.cmake.in
   "@PACKAGE_INIT@\ninclude(\"\${CMAKE_CURRENT_LIST_DIR}/minitorchlibTargets.cmake\")\n"
-)
+ )
 
 # 1. Configure that file to be ready for installation
 configure_package_config_file(

@@ -13,4 +13,4 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION include)
 
 target_include_directories(
   ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-                         $<INSTALL_INTERFACE:include>)
+                         $<INSTALL_INTERFACE:include>) 
