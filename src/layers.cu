@@ -97,8 +97,8 @@ Matrix &Linear::get_weights() {
     return weights;
 }
 
-std::vector<Matrix *> Linear::parameters() {
-    return {&weights, &bias};
+std::vector<Parameter> Linear::parameters() {
+    return {{&weights, &grad_weights}, {&bias, &grad_bias}};
 }
 //
 Matrix &Linear::get_bias() {
