@@ -1,5 +1,7 @@
-# Based on LLVM, but with common "modern" adjustments
+Language: Cpp
 BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: false
@@ -17,15 +19,11 @@ BraceWrapping:
   BeforeElse: false
   IndentBraces: false
   SplitEmptyFunction: true
-ColumnLimit: 100
-IndentWidth: 4
 Standard: Latest
 UseTab: Never
-# Keeps your Matrix header includes organized
 SortIncludes: true
 IncludeCategories:
   - Regex: '^<.*'
     Priority: 1
   - Regex: '.*'
     Priority: 2
-

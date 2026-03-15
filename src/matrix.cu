@@ -4,6 +4,7 @@
 #include <random>
 #include "minitorch/matrix.cuh"
 #include "minitorch/memory_pool.cuh"
+#include "minitorch/random.cuh"
 #include "minitorch/utils.cuh"
 using namespace minitorch;
 
@@ -33,6 +34,24 @@ __global__ void ker_extract_batch(const float *source, float *dest, const int *i
     auto orig_row = indices[start_idx + dest_row];
 
     dest[i] = source[orig_row * num_cols + dest_col];
+}
+
+__global__ void uniform_init(float *data, int cols, int rows, float scale) {
+    int x = threadIdx.x + blockDim.x * blockIdx.x;
+    int y = threadIdx.y + blockDim.y * blockIdx.y;
+
+    if (x < cols && y < rows) {
+        data[get_idx_2d(y, x, cols)] =
+            data[get_idx_2d(y, x, cols)] * scale * sqrt(6.0f / (cols + rows));
+    }
+}
+
+__global__ void scale_fill(float *data, float low, float high, int n) {
+    int x = threadIdx.x + blockDim.x * blockIdx.x;
+
+    if (x < n) {
+        data[x] = (high - low) * data[x] + low;
+    }
 }
 
 /* CLASS MEMBER FUNCTIONS */
@@ -135,20 +154,13 @@ Matrix Matrix::copy() const {
 }
 
 // random fill
-void Matrix::rand_fill(float low, float high) { // move to kernel
-    float *buffer = new float[Matrix::getcols() * Matrix::getrows()];
+void Matrix::rand_fill(float low, float high) {
+    int total_elements = rows * cols;
+    int threads = 256;
+    int blocks = (total_elements + threads - 1) / threads;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist(low, high);
-
-    for (int i = 0; i < Matrix::getcols() * Matrix::getrows(); i++) {
-        buffer[i] = dist(gen);
-    }
-
-    Matrix::to_device(buffer);
-
-    delete[] buffer;
+    Random_Manager::instance().uniform(this->data, total_elements);
+    scale_fill<<<blocks, threads>>>(this->data, low, high, total_elements);
 }
 
 Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) const {
@@ -161,4 +173,18 @@ Matrix Matrix::extract_batch(int *d_indices, int start_idx, int batch_size) cons
                                            batch_size, this->cols);
 
     return mini_batch;
+}
+
+// xavier_he
+
+void Matrix::uniform_initialisation(float scale) {
+    float *data = this->data;
+    int rows = this->rows;
+    int cols = this->cols;
+
+    dim3 threads(16, 16, 1);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
+
+    Random_Manager::instance().uniform(data, rows * cols);
+    uniform_init<<<blocks, threads>>>(data, cols, rows, scale);
 }

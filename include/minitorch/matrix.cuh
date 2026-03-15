@@ -44,5 +44,7 @@ public:
 
     // for mini-batches, takes a `list` of indices and a start index and batchsize
     Matrix extract_batch(int *d_indices, int start_idx, int batch_size) const;
+
+    void uniform_initialisation(float scale);
 };
 } // namespace minitorch
