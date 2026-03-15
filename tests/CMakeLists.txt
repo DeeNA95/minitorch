@@ -6,4 +6,3 @@ target_link_libraries(test_matrix PRIVATE minitorchlib)
 target_link_libraries(test_ops PRIVATE minitorchlib)
 target_link_libraries(test_forward PRIVATE minitorchlib)
 target_link_libraries(test_xor PRIVATE minitorchlib)
-

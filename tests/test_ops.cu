@@ -17,7 +17,9 @@ void multiplyMatrices(int n, int k, int m, const float *A, const float *B, float
             // Initialize the element C[i][j] to 0 before the inner loop
             C[i * m + j] = 0;
             // Inner loop calculates the dot product of the i-th row of A and j-th column of B
-            for (int q = 0; q < k; ++q) { C[i * m + j] += A[i * k + q] * B[q * m + j]; }
+            for (int q = 0; q < k; ++q) {
+                C[i * m + j] += A[i * k + q] * B[q * m + j];
+            }
         }
     }
 }
