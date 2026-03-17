@@ -81,7 +81,8 @@ void __global__ matrix_sub(const float *__restrict__ a, const float *__restrict_
         return;
     c[get_idx_2d(y, x, n_cols)] = a[get_idx_2d(y, x, n_cols)] - b[get_idx_2d(y, x, n_cols)];
 }
-
+// TODO: add overload to alow for matrix sub without specifying the matrix ie the function will
+// return a mat
 void mat_sub(const Matrix &A, const Matrix &B, Matrix &C) {
     const float *a_data = A.getdata();
     const float *b_data = B.getdata();
@@ -205,6 +206,7 @@ void __global__ matrix_matmul(const float *__restrict__ A, const float *__restri
             tile_b[y_local][x_local] = B[(i * TILE_SIZE + y_local) * b_cols + x];
         }
         __syncthreads();
+        // perform the dot product
         for (int j = 0; j < TILE_SIZE; j++) {
             sum += tile_a[y_local][j] * tile_b[j][x_local];
         }

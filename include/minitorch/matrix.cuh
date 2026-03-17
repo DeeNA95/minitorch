@@ -46,5 +46,14 @@ public:
     Matrix extract_batch(int *d_indices, int start_idx, int batch_size) const;
 
     void uniform_initialisation(float scale);
+
+    // overloads
+    Matrix operator+(const Matrix &other) const;
+
+    Matrix operator*(const Matrix &other) const;
+    Matrix operator*(float scalar) const;
+    Matrix operator-(const Matrix &other) const;
+    // not an overload but for element-wise multiplication
+    Matrix elem_mul(const Matrix &other) const;
 };
 } // namespace minitorch

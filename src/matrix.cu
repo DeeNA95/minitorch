@@ -4,6 +4,7 @@
 #include <random>
 #include "minitorch/matrix.cuh"
 #include "minitorch/memory_pool.cuh"
+#include "minitorch/ops.cuh"
 #include "minitorch/random.cuh"
 #include "minitorch/utils.cuh"
 using namespace minitorch;
@@ -145,7 +146,7 @@ Matrix &Matrix::operator=(Matrix &&other) noexcept {
 Matrix Matrix::copy() const {
     int rows = this->rows, cols = this->cols;
 
-    Matrix out = Matrix(rows, cols);
+    Matrix Matrix out(rows, cols);
     // this refers to the current matrix as it is a memeber function
     cudaMemcpy(out.data, this->data, (std::size_t)(sizeof(float) * rows * cols),
                cudaMemcpyDeviceToDevice);
@@ -187,4 +188,37 @@ void Matrix::uniform_initialisation(float scale) {
 
     Random_Manager::instance().uniform(data, rows * cols);
     uniform_init<<<blocks, threads>>>(data, cols, rows, scale);
+}
+
+// overload operators
+Matrix Matrix::operator+(const Matrix &other) const {
+    int rows = this->rows, cols = this->cols;
+    Matrix out(rows, cols);
+    mat_add(*this, other, out);
+    return out;
+}
+
+Matrix Matrix::operator*(const Matrix &other) const {
+    return mat_matmul(*this, other);
+}
+
+Matrix Matrix::operator*(float scalar) const {
+    int rows = this->rows, cols = this->cols;
+    Matrix out(rows, cols);
+    mat_scalar_mul(*this, scalar, out);
+    return out;
+}
+
+Matrix Matrix::operator-(const Matrix &other) const {
+    int rows = this->rows, cols = this->cols;
+    Matrix out(rows, cols);
+    mat_sub(*this, other, out);
+    return out;
+}
+
+Matrix Matrix::elem_mul(const Matrix &other) const {
+    int rows = this->rows, cols = this->cols;
+    Matrix out(rows, cols);
+    mat_elem_mul(*this, other, out);
+    return out;
 }
