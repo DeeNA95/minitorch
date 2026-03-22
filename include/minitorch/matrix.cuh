@@ -56,4 +56,10 @@ public:
     // not an overload but for element-wise multiplication
     Matrix elem_mul(const Matrix &other) const;
 };
+
+// Non-member functions for Matrix operations
+Matrix add(const Matrix &A, const Matrix &B);
+Matrix sub(const Matrix &A, const Matrix &B);
+Matrix mat_matmul(const Matrix &A, const Matrix &B);
+
 } // namespace minitorch

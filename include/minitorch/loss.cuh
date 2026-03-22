@@ -1,9 +1,9 @@
 #pragma once
 #include <cuda_runtime.h>
-#include "minitorch/matrix.cuh"
+#include "minitorch/tensor.cuh"
 
 namespace minitorch {
 
-float mse_forward(Matrix &preds, Matrix &actual);
-Matrix mse_backward(Matrix &preds, Matrix &actual);
+float mse_forward(Tensor &preds, Tensor &actual);
+Tensor mse_backward(Tensor &preds, Tensor &actual);
 } // namespace minitorch

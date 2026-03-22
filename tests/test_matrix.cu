@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include "minitorch/matrix.cuh"
+#include "minitorch/ops.cuh"
 
 using namespace minitorch;
 
@@ -12,7 +13,7 @@ int main() {
     std::cout << "END OF MATRIX TEST" << '\n';
 
     std::cout << "UNIFORM XAVIER HE" << '\n';
-    Matrix mat2 = Matrix(20, 14);
+    Matrix mat2 = Matrix(14, 14);
     mat2.uniform_initialisation(0.01f);
     mat2.print();
 
@@ -21,13 +22,13 @@ int main() {
     mat = mat + mat;
     mat.print();
 
-    mat = mat * mat;
+    mat = mat * mat2;
     mat.print();
 
     mat = mat * 3.14f;
     mat.print();
 
-    mat = mat - mat * mat;
+    mat = mat - mat * mat2;
     mat.print();
 
     mat = mat.elem_mul(mat);

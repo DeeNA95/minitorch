@@ -22,11 +22,11 @@ __global__ void ker_sigmoid_forward(float *__restrict__ input, int n_cols, int n
     input[get_idx_2d(y, x, n_cols)] = (1 / (1 + expf(-input[get_idx_2d(y, x, n_cols)])));
 }
 
-Matrix Sigmoid::forward(const Matrix &inputs) {
-    Matrix output_matrix = inputs.copy();
+Tensor Sigmoid::forward(const Tensor &inputs) {
+    Tensor output_matrix = inputs.copy();
 
     float *input = output_matrix.getdata();
-    int n_cols = output_matrix.getcols(), n_rows = output_matrix.getrows();
+    int n_cols = output_matrix.get_shape()[1], n_rows = output_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
@@ -52,14 +52,14 @@ __global__ void ker_sigmoid_backward(const float *__restrict__ gradients_matrix,
                                          (1.0f - output_matrix[get_idx_2d(y, x, n_cols)]);
 }
 
-Matrix Sigmoid::backward(const Matrix &gradients_matrix) {
+Tensor Sigmoid::backward(const Tensor &gradients_matrix) {
     float *grads = gradients_matrix.getdata(), *output_matrix = this->output_cache.getdata();
-    int n_cols = gradients_matrix.getcols(), n_rows = gradients_matrix.getrows();
+    int n_cols = gradients_matrix.get_shape()[1], n_rows = gradients_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
 
-    Matrix grad_in(n_rows, n_cols);
+    Tensor grad_in(n_rows, n_cols);
 
     ker_sigmoid_backward<<<blocks, threads>>>(grads, output_matrix, grad_in.getdata(), n_rows,
                                               n_cols);
@@ -80,11 +80,11 @@ __global__ void ker_relu_forward(float *__restrict__ input, int n_cols, int n_ro
     input[get_idx_2d(y, x, n_cols)] = max(0.0f, input[get_idx_2d(y, x, n_cols)]);
 }
 
-Matrix Relu::forward(const Matrix &inputs) {
-    Matrix output_matrix = inputs.copy();
+Tensor Relu::forward(const Tensor &inputs) {
+    Tensor output_matrix = inputs.copy();
 
     float *input = output_matrix.getdata();
-    int n_cols = output_matrix.getcols(), n_rows = output_matrix.getrows();
+    int n_cols = output_matrix.get_shape()[1], n_rows = output_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
@@ -108,14 +108,14 @@ __global__ void ker_relu_backward(const float *__restrict__ gradients_matrix,
                                              : 0.0f;
 }
 
-Matrix Relu::backward(const Matrix &gradients_matrix) {
+Tensor Relu::backward(const Tensor &gradients_matrix) {
     float *grads = gradients_matrix.getdata(), *relu_ins = this->output_cache.getdata();
-    int n_cols = gradients_matrix.getcols(), n_rows = gradients_matrix.getrows();
+    int n_cols = gradients_matrix.get_shape()[1], n_rows = gradients_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
 
-    Matrix grad_in = Matrix(n_rows, n_cols);
+    Tensor grad_in = Tensor(n_rows, n_cols);
 
     ker_relu_backward<<<blocks, threads>>>(grads, relu_ins, grad_in.getdata(), n_rows, n_cols);
     cudaDeviceSynchronize();
@@ -145,10 +145,10 @@ __global__ void ker_gelu_forward(float *input, int n_cols, int n_rows) {
     input[get_idx_2d(y, x, n_cols)] = 0.5 * q * (1 + dev_tanh(tanh_arg));
 }
 
-Matrix Gelu::forward(const Matrix &inputs) {
-    Matrix output_matrix = inputs.copy();
+Tensor Gelu::forward(const Tensor &inputs) {
+    Tensor output_matrix = inputs.copy();
     float *input = output_matrix.getdata();
-    int n_cols = output_matrix.getcols(), n_rows = output_matrix.getrows();
+    int n_cols = output_matrix.get_shape()[1], n_rows = output_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
@@ -179,14 +179,14 @@ __global__ void ker_gelu_backward(const float *__restrict__ gradients_matrix,
         gradients_matrix[get_idx_2d(y, x, n_cols)];
 }
 
-Matrix Gelu::backward(const Matrix &gradients_matrix) {
+Tensor Gelu::backward(const Tensor &gradients_matrix) {
     float *grads = gradients_matrix.getdata(), *gelu_ins = this->input_cache.getdata();
-    int n_cols = gradients_matrix.getcols(), n_rows = gradients_matrix.getrows();
+    int n_cols = gradients_matrix.get_shape()[1], n_rows = gradients_matrix.get_shape()[0];
 
     dim3 threads(16, 16, 1);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
 
-    Matrix grad_in = Matrix(n_rows, n_cols);
+    Tensor grad_in = Tensor(n_rows, n_cols);
 
     ker_gelu_backward<<<blocks, threads>>>(grads, gelu_ins, grad_in.getdata(), n_rows, n_cols);
     cudaDeviceSynchronize();

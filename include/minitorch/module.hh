@@ -1,20 +1,20 @@
 #pragma once
 #include <vector>
-#include "minitorch/matrix.cuh"
+#include "minitorch/tensor.cuh"
 using namespace minitorch;
 namespace minitorch {
 
 struct Parameter
 {
-    Matrix *weight;
-    const Matrix *grad;
+    Tensor *weight;
+    const Tensor *grad;
 };
 
 class Module {
 public:
     virtual ~Module() = default;
-    virtual Matrix forward(const Matrix &inputs) = 0;
-    virtual Matrix backward(const Matrix &gradients_matrix) = 0;
+    virtual Tensor forward(const Tensor &inputs) = 0;
+    virtual Tensor backward(const Tensor &gradients_Tensor) = 0;
     virtual std::vector<Parameter> parameters() {
         return {};
     }

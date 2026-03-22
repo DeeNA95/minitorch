@@ -49,16 +49,16 @@ __global__ void ker_mse_forward(const float *__restrict__ preds_data,
     }
 };
 
-float mse_forward(Matrix &preds, Matrix &actual) {
+float mse_forward(Tensor &preds, Tensor &actual) {
     float *preds_data = preds.getdata();
     float *actuals_data = actual.getdata();
-    int n_cols = preds.getcols();
-    int n_rows = preds.getrows();
+    int n_cols = preds.get_shape()[1];
+    int n_rows = preds.get_shape()[0];
 
-    assert(preds.getcols() == actual.getcols() && "Matrices must have the same number of columns");
-    assert(preds.getrows() == actual.getrows() && "Matrices must have the same number of rows");
+    assert(preds.get_shape()[1] == actual.get_shape()[1] && "Matrices must have the same number of columns");
+    assert(preds.get_shape()[0] == actual.get_shape()[0] && "Matrices must have the same number of rows");
 
-    int n = preds.getcols() * preds.getrows();
+    int n = preds.get_shape()[1] * preds.get_shape()[0];
 
     dim3 threads(256);
     dim3 blocks((n_cols + threads.x - 1) / threads.x);
@@ -89,21 +89,21 @@ __global__ void ker_mse_backward(const float *__restrict__ preds, const float *_
         (2.0f / n) * (preds[get_idx_2d(y, x, n_cols)] - actuals[get_idx_2d(y, x, n_cols)]);
 }
 
-Matrix mse_backward(Matrix &preds, Matrix &actual) {
+Tensor mse_backward(Tensor &preds, Tensor &actual) {
     float *preds_data = preds.getdata();
     float *actuals_data = actual.getdata();
-    int n_cols = preds.getcols();
-    int n_rows = preds.getrows();
+    int n_cols = preds.get_shape()[1];
+    int n_rows = preds.get_shape()[0];
 
-    assert(preds.getcols() == actual.getcols() && "Matrices must have the same number of columns");
-    assert(preds.getrows() == actual.getrows() && "Matrices must have the same number of rows");
+    assert(preds.get_shape()[1] == actual.get_shape()[1] && "Matrices must have the same number of columns");
+    assert(preds.get_shape()[0] == actual.get_shape()[0] && "Matrices must have the same number of rows");
 
-    int n = preds.getcols() * preds.getrows();
+    int n = preds.get_shape()[1] * preds.get_shape()[0];
 
     dim3 threads(16, 16);
     dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y);
 
-    Matrix derivs = Matrix(n_rows, n_cols);
+    Tensor derivs = Tensor(n_rows, n_cols);
 
     ker_mse_backward<<<blocks, threads>>>(preds.getdata(), actual.getdata(), derivs.getdata(), n,
                                           n_cols);

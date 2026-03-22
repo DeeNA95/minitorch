@@ -1,8 +1,16 @@
-add_executable(test_matrix test_matrix.cu)
-add_executable(test_ops test_ops.cu)
-add_executable(test_forward forward.cu)
-add_executable(test_xor test_xor.cu)
-target_link_libraries(test_matrix PRIVATE minitorchlib)
-target_link_libraries(test_ops PRIVATE minitorchlib)
-target_link_libraries(test_forward PRIVATE minitorchlib)
-target_link_libraries(test_xor PRIVATE minitorchlib)
+# Find all CUDA source files in the current (tests) directory
+file(GLOB TEST_SOURCES "*.cu")
+
+foreach(TEST_SOURCE ${TEST_SOURCES})
+    # Get the file name without extension to use as target name
+    get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
+    
+    # Add an executable for each test file
+    add_executable(${TEST_NAME} ${TEST_SOURCE})
+    
+    # Link each test to the main library
+    target_link_libraries(${TEST_NAME} PUBLIC minitorchlib)
+    
+    # Include headers from parent include directory
+    target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+endforeach()

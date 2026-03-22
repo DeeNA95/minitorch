@@ -1,13 +1,17 @@
 #include <cstddef>
 #include <cuda_runtime.h>
+#include <filesystem>
 #include <iostream>
 #include <random>
+#include <cassert>
 #include "minitorch/matrix.cuh"
 #include "minitorch/memory_pool.cuh"
 #include "minitorch/ops.cuh"
+#include "minitorch/ops_utils.cuh"
 #include "minitorch/random.cuh"
 #include "minitorch/utils.cuh"
-using namespace minitorch;
+namespace minitorch {
+
 
 /* KERNELS */
 
@@ -36,7 +40,7 @@ __global__ void ker_extract_batch(const float *source, float *dest, const int *i
 
     dest[i] = source[orig_row * num_cols + dest_col];
 }
-
+// uniform init
 __global__ void uniform_init(float *data, int cols, int rows, float scale) {
     int x = threadIdx.x + blockDim.x * blockIdx.x;
     int y = threadIdx.y + blockDim.y * blockIdx.y;
@@ -55,6 +59,40 @@ __global__ void scale_fill(float *data, float low, float high, int n) {
     }
 }
 
+// addition
+void __global__ matrix_add(const float *__restrict__ a, const float *__restrict__ b, float *c,
+                           int n_cols, int n_rows) {
+    dev_add(a, b, c, n_cols, n_rows);
+}
+// subtraction
+void __global__ matrix_sub(const float *__restrict__ a, const float *__restrict__ b, float *c,
+                           int n_cols, int n_rows) {
+    dev_sub(a, b, c, n_cols, n_rows);
+}
+
+void __global__ matrix_scalar_multiplication(const float *__restrict__ a, float b, float *c,
+                                            int n_cols, int n_rows) {
+    dev_scalar_mul(a, b, c, n_cols, n_rows);
+}
+
+void __global__ matrix_elementwise_multiplication(const float *__restrict__ a, const float *__restrict__ b, float *c,
+                                            int n_cols, int n_rows) {
+    dev_elem_mul(a, b, c, n_cols, n_rows);
+}
+
+void __global__ matrix_multiplication(const float *__restrict__ a, const float *__restrict__ b, float *c,
+                                            int a_rows, int b_rows, int b_cols) {
+    dev_dot_product(a, b, c, a_rows, b_rows, b_cols);
+}
+
+void __global__ bias_add_ker(const float *__restrict__ a, const float *__restrict__ b, float *c,
+                         int n_cols, int n_rows) {
+    dev_bias_add(a, b, c, n_cols, n_rows);
+}
+
+void __global__ matrix_transpose_ker(const float *A, float *C, int n_cols, int n_rows) {
+    dev_transpose(A, C, n_cols, n_rows);
+}
 /* CLASS MEMBER FUNCTIONS */
 
 // constructor
@@ -146,7 +184,7 @@ Matrix &Matrix::operator=(Matrix &&other) noexcept {
 Matrix Matrix::copy() const {
     int rows = this->rows, cols = this->cols;
 
-    Matrix Matrix out(rows, cols);
+    Matrix out(rows, cols);
     // this refers to the current matrix as it is a memeber function
     cudaMemcpy(out.data, this->data, (std::size_t)(sizeof(float) * rows * cols),
                cudaMemcpyDeviceToDevice);
@@ -191,10 +229,32 @@ void Matrix::uniform_initialisation(float scale) {
 }
 
 // overload operators
-Matrix Matrix::operator+(const Matrix &other) const {
-    int rows = this->rows, cols = this->cols;
+
+Matrix add(const Matrix &A, const Matrix &B) {
+    int rows = A.getrows(), cols = A.getcols();
     Matrix out(rows, cols);
-    mat_add(*this, other, out);
+    dim3 threads(16, 16, 1);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
+    matrix_add<<<blocks, threads>>>(A.getdata(), B.getdata(), out.getdata(), cols, rows);
+    return out;
+}
+Matrix Matrix::operator+(const Matrix &other) const {
+    return add(*this, other);
+}
+
+Matrix mat_matmul(const Matrix &A, const Matrix &B) {
+    int a_rows = A.getrows();
+    int a_cols = A.getcols();
+    int b_rows = B.getrows();
+    int b_cols = B.getcols();
+
+    assert(a_cols == b_rows &&
+           "Number of columns in matrix A must be equal to number of rows in Matrix B");
+
+    Matrix out(a_rows, b_cols);
+    dim3 threads(TILE_SIZE, TILE_SIZE, 1);
+    dim3 blocks((b_cols + threads.x - 1) / threads.x, (a_rows + threads.y - 1) / threads.y);
+    matrix_multiplication<<<blocks, threads>>>(A.getdata(), B.getdata(), out.getdata(), a_rows, b_rows, b_cols);
     return out;
 }
 
@@ -205,20 +265,70 @@ Matrix Matrix::operator*(const Matrix &other) const {
 Matrix Matrix::operator*(float scalar) const {
     int rows = this->rows, cols = this->cols;
     Matrix out(rows, cols);
-    mat_scalar_mul(*this, scalar, out);
+    dim3 threads(16, 16, 1);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
+    matrix_scalar_multiplication<<<blocks, threads>>>(this->data, scalar, out.getdata(), cols, rows);
+    return out;
+}
+
+Matrix sub(const Matrix &A, const Matrix &B) {
+    int rows = A.getrows(), cols = A.getcols();
+    Matrix out(rows, cols);
+    dim3 threads(16, 16, 1);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
+    matrix_sub<<<blocks, threads>>>(A.getdata(), B.getdata(), out.getdata(), cols, rows);
     return out;
 }
 
 Matrix Matrix::operator-(const Matrix &other) const {
-    int rows = this->rows, cols = this->cols;
-    Matrix out(rows, cols);
-    mat_sub(*this, other, out);
-    return out;
+    return sub(*this, other);
 }
 
 Matrix Matrix::elem_mul(const Matrix &other) const {
     int rows = this->rows, cols = this->cols;
     Matrix out(rows, cols);
-    mat_elem_mul(*this, other, out);
+    dim3 threads(16, 16, 1);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
+    matrix_elementwise_multiplication<<<blocks, threads>>>(this->data, other.getdata(), out.getdata(), cols, rows);
     return out;
 }
+
+// Implement mat_* operations from ops.cuh
+void mat_add(const Matrix &A, const Matrix &B, Matrix &C) {
+    C = add(A, B);
+}
+
+void mat_sub(const Matrix &A, const Matrix &B, Matrix &C) {
+    C = sub(A, B);
+}
+
+void mat_elem_mul(const Matrix &A, const Matrix &B, Matrix &C) {
+    C = A.elem_mul(B);
+}
+
+void mat_scalar_mul(const Matrix &A, float B, Matrix &C) {
+    C = A * B;
+}
+
+Matrix mat_transpose(Matrix &A) {
+    int r = A.getrows();
+    int c = A.getcols();
+    Matrix C = Matrix(c, r);
+    dim3 threads(16, 16, 1);
+    dim3 blocks((c + threads.x - 1) / threads.x, (r + threads.y - 1) / threads.y, 1);
+    matrix_transpose_ker<<<blocks, threads>>>(A.getdata(), C.getdata(), c, r);
+    return C;
+}
+
+void b_add(const Matrix &A, const Matrix &B, Matrix &C) {
+    const float *a_data = A.getdata();
+    const float *b_data = B.getdata();
+    float *c_data = C.getdata();
+    int n_cols = B.getcols();
+    int n_rows = A.getrows();
+    dim3 threads(16, 16, 1);
+    dim3 blocks((n_cols + threads.x - 1) / threads.x, (n_rows + threads.y - 1) / threads.y, 1);
+    bias_add_ker<<<blocks, threads>>>(a_data, b_data, c_data, n_cols, n_rows);
+}
+
+} // namespace minitorch

@@ -22,10 +22,10 @@ __global__ void sgd(float *__restrict__ weights, const float *__restrict__ grad_
     }
 }
 
-void sgd_update(Matrix &weights, const Matrix &grad_weights, float lr) {
+void sgd_update(Tensor &weights, const Tensor &grad_weights, float lr) {
     float *w = weights.getdata();
     const float *gw = grad_weights.getdata();
-    int n_rows = weights.getrows(), n_cols = weights.getcols();
+    int n_rows = weights.get_shape()[0], n_cols = weights.get_shape()[1];
 
     int threads = 256;
 
@@ -44,14 +44,14 @@ Adam::Adam(float lr, float beta1, float beta2, float epsilon, float weight_decay
     this->t = 0;
 }
 
-void Adam::add_parameter(Matrix &param, const Matrix &grad) {
+void Adam::add_parameter(Tensor &param, const Tensor &grad) {
     Adam::params.push_back(&param);
     Adam::grads.push_back(&grad);
 
-    Matrix m_buffer(param.getrows(), param.getcols());
+    Tensor m_buffer(param.get_shape()[0], param.get_shape()[1]);
     m_buffer.fill(0.0f);
 
-    Matrix v_buffer(param.getrows(), param.getcols());
+    Tensor v_buffer(param.get_shape()[0], param.get_shape()[1]);
     v_buffer.fill(0.0f);
 
     Adam::m_buffers.push_back(std::move(m_buffer));
@@ -95,7 +95,7 @@ void Adam::step() {
               *v_buffer = this->v_buffers[i].getdata();
 
         const float *grad = this->grads[i]->getdata();
-        int n = this->params[i]->getrows() * this->params[i]->getcols();
+        int n = this->params[i]->get_shape()[0] * this->params[i]->get_shape()[1];
         int threads = 256;
         int blocks = (n + threads - 1) / threads;
         ker_adam_update<<<blocks, threads>>>(grad, param, m_buffer, v_buffer, this->beta1,

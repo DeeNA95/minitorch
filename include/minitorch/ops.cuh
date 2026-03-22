@@ -1,5 +1,6 @@
 #pragma once
 #include "matrix.cuh"
+#include "tensor.cuh"
 
 namespace minitorch {
 
@@ -10,4 +11,5 @@ void mat_scalar_mul(const Matrix &A, float B, Matrix &C); // no doubles for now
 Matrix mat_transpose(Matrix &A);
 Matrix mat_matmul(const Matrix &A, const Matrix &B);
 void b_add(const Matrix &, const Matrix &B, Matrix &C);
+Tensor tensor_matmul(const Tensor &A, const Tensor &B);
 } // namespace minitorch

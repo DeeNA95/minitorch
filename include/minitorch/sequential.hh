@@ -1,7 +1,7 @@
 #include <vector>
 #include "minitorch/activations.cuh"
 #include "minitorch/layers.cuh"
-#include "minitorch/matrix.cuh"
+#include "minitorch/tensor.cuh"
 #include "minitorch/module.hh"
 
 using namespace minitorch;
@@ -15,8 +15,8 @@ private:
 public:
     Sequential(std::vector<Module *> layers) : layers(layers) {};
 
-    Matrix forward(const Matrix &inputs) override {
-        Matrix out = inputs.copy();
+    Tensor forward(const Tensor &inputs) override {
+        Tensor out = inputs.copy();
 
         for (auto layer : layers) {
             out = layer->forward(out);
@@ -24,8 +24,8 @@ public:
         return out;
     }
 
-    Matrix backward(const Matrix &gradients_matrix) override {
-        Matrix current_grad = gradients_matrix.copy();
+    Tensor backward(const Tensor &gradients_matrix) override {
+        Tensor current_grad = gradients_matrix.copy();
 
         // Backward pass must iterate in reverse!
         for (auto it = layers.rbegin(); it != layers.rend(); ++it) {

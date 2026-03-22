@@ -3,7 +3,7 @@
 #include "iostream"
 #include "minitorch/activations.cuh"
 #include "minitorch/layers.cuh"
-#include "minitorch/matrix.cuh"
+#include "minitorch/tensor.cuh"
 #include "minitorch/ops.cuh"
 
 using namespace minitorch;
@@ -24,11 +24,11 @@ Linear::~Linear() {
 }
 
 // bad idea to
-Matrix Linear::forward(const Matrix &inputs /*, std::string act_fn*/) {
+Tensor Linear::forward(const Tensor &inputs /*, std::string act_fn*/) {
     Linear::input_cache = std::move(inputs.copy());
-    Matrix weighted = mat_matmul(inputs, weights);
+    Tensor weighted = tensor_matmul(inputs, weights);
 
-    Matrix output = Matrix(weighted.getrows(), weighted.getcols());
+    Tensor output = Tensor(weighted.get_shape()[0], weighted.get_shape()[1]);
     b_add(weighted, bias, output);
 
     /*if (act_fn == "relu") {
@@ -43,7 +43,7 @@ Matrix Linear::forward(const Matrix &inputs /*, std::string act_fn*/) {
     return output;
 }
 
-Matrix Linear::backward(const Matrix &grad_output) {
+Tensor Linear::backward(const Tensor &grad_output) {
     // takes grads from upper layer and computes 3 things
     // -grad_weights the error attributable to weight
     // -grad_inputs
@@ -53,10 +53,10 @@ Matrix Linear::backward(const Matrix &grad_output) {
      * grad_weights = grad_outputs * Inputs
      * bias = grad_outputs
      */
-    Matrix grad_inputs = mat_matmul(
+    Tensor grad_inputs = tensor_matmul(
         grad_output,
-        mat_transpose(this->weights)); // this will be passed as grad_output to the lower layer
-    this->grad_weights = std::move(mat_matmul(mat_transpose(this->input_cache), grad_output));
+        tensor_transpose(this->weights)); // this will be passed as grad_output to the lower layer
+    this->grad_weights = std::move(tensor_matmul(tensor_transpose(this->input_cache), grad_output));
 
     // grad_bias should be the sum of grad_ouput along rows to each batch, but since we are
     // currently batchless its just equal to grad_output,
@@ -66,24 +66,24 @@ Matrix Linear::backward(const Matrix &grad_output) {
 }
 
 void Linear::fix_weights() {
-    float *weights_buffer = new float[weights.getcols() * weights.getrows()];
+    float *weights_buffer = new float[weights.get_shape()[1] * weights.get_shape()[0]];
     weights.to_host(weights_buffer);
 
-    for (int i = 0; i < weights.getrows(); i++) {
-        for (int j = 0; j < weights.getcols(); j++) {
+    for (int i = 0; i < weights.get_shape()[0]; i++) {
+        for (int j = 0; j < weights.get_shape()[1]; j++) {
             if (i == j) {
-                weights_buffer[i * weights.getcols() + j] = 1.0f;
+                weights_buffer[i * weights.get_shape()[1] + j] = 1.0f;
             } else {
-                weights_buffer[i * weights.getcols() + j] = 0.0f;
+                weights_buffer[i * weights.get_shape()[1] + j] = 0.0f;
             }
         }
     }
     weights.to_device(weights_buffer);
     delete[] weights_buffer;
-    float *bias_buffer = new float[bias.getcols()];
+    float *bias_buffer = new float[bias.get_shape()[1]];
     bias.to_host(bias_buffer);
 
-    for (int i = 0; i < bias.getcols(); i++) {
+    for (int i = 0; i < bias.get_shape()[1]; i++) {
         bias_buffer[i] = 0.0f;
     };
 
@@ -93,7 +93,7 @@ void Linear::fix_weights() {
 
 //
 //
-Matrix &Linear::get_weights() {
+Tensor &Linear::get_weights() {
     return weights;
 }
 
@@ -101,13 +101,13 @@ std::vector<Parameter> Linear::parameters() {
     return {{&weights, &grad_weights}, {&bias, &grad_bias}};
 }
 //
-Matrix &Linear::get_bias() {
+Tensor &Linear::get_bias() {
     return bias;
 }
-const Matrix &Linear::get_grad_bias() const {
+const Tensor &Linear::get_grad_bias() const {
     return grad_bias;
 }
-const Matrix &Linear::get_grad_weights() const {
+const Tensor &Linear::get_grad_weights() const {
     return grad_weights;
 }
 } // namespace minitorch
