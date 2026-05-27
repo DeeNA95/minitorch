@@ -21,8 +21,8 @@ int main(int argc, char *argv[]) {
     }
     std::cout << "Starting training for " << epochs << " epochs with LR=" << lr << '\n';
     // an xor test using 2 layers
-    Matrix input = Matrix(4, 2);
-    Matrix target = Matrix(4, 1);
+    Tensor input = Tensor(4, 2);
+    Tensor target = Tensor(4, 1);
 
     float *in_data = new float[8];
     float *targ_data = new float[4];
@@ -55,10 +55,10 @@ int main(int argc, char *argv[]) {
 
     for (int epoch = 0; epoch < epochs; epoch++) {
         // forward
-        Matrix out1 = l1.forward(input);
-        Matrix a1 = sig1.forward(out1);
-        Matrix out2 = l2.forward(a1);
-        Matrix a2 = sig2.forward(out2);
+        Tensor out1 = l1.forward(input);
+        Tensor a1 = sig1.forward(out1);
+        Tensor out2 = l2.forward(a1);
+        Tensor a2 = sig2.forward(out2);
 
         // loss this just for printing the one that goes into the backward is handled in
         // mse_backward
@@ -67,11 +67,11 @@ int main(int argc, char *argv[]) {
             std::cout << "EPOCH " << epoch << " LOSS " << loss << '\n';
         }
         // backward
-        Matrix mse_back = mse_backward(a2, target);
-        Matrix a2_back = sig2.backward(mse_back);
-        Matrix l2_back = l2.backward(a2_back);
-        Matrix a1_back = sig1.backward(l2_back);
-        Matrix l1_back = l1.backward(a1_back);
+        Tensor mse_back = mse_backward(a2, target);
+        Tensor a2_back = sig2.backward(mse_back);
+        Tensor l2_back = l2.backward(a2_back);
+        Tensor a1_back = sig1.backward(l2_back);
+        Tensor l1_back = l1.backward(a1_back);
 
         // update weights
         sgd_update(l1.get_weights(), l1.get_grad_weights(), lr);

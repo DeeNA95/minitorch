@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <random>
-#include "minitorch/matrix.cuh"
+#include "minitorch/tensor.cuh"
 #include "minitorch/ops.cuh"
 
 using namespace minitorch;
@@ -26,51 +26,51 @@ void multiplyMatrices(int n, int k, int m, const float *A, const float *B, float
 
 int main() {
     // simple 4x4 matrix
-    Matrix A = Matrix(4, 4);
-    Matrix B = Matrix(4, 4);
+    Tensor A = Tensor(4, 4);
+    Tensor B = Tensor(4, 4);
 
-    Matrix C = Matrix(4, 4);
+    Tensor C = Tensor(4, 4);
 
     A.fill(3.14);
     B.fill(6.86);
 
-    mat_add(A, B, C);
+    C = A + B;
     C.print();
     std::cout << "AFTER ADD" << '\n';
-    mat_sub(A, B, C);
+    C = A - B;
     C.print();
     std::cout << "AFTER SUB" << '\n';
 
-    mat_elem_mul(A, B, C);
+    C = elementwise_multiplication(A, B);
     C.print();
     std::cout << "AFTER ELEMENT WISE MULTIPLICATION" << '\n';
 
-    mat_scalar_mul(A, 1.7321, C);
+    C = A * 1.7321f;
     C.print();
     std::cout << "AFTER SCALAR MULTIPLE BY 1.7321" << '\n';
 
-    Matrix D = Matrix(12, 3);
+    Tensor D = Tensor(12, 3);
     D.fill(1.21);
     std::cout << "BEFORE TRANSPOSE" << '\n';
     D.print();
 
-    Matrix transposed = mat_transpose(D);
+    Tensor transposed = tensor_transpose(D);
     std::cout << "TRANSPOSED" << '\n';
     transposed.print();
 
-    Matrix X = Matrix(4, 8);
+    Tensor X = Tensor(4, 8);
     X.fill(2);
 
-    Matrix Y = mat_matmul(A, X);
+    Tensor Y = tensor_matmul(A, X);
     std::cout << "MATMUL" << '\n';
     Y.print();
 
     std::cout << '\n' << '\n';
 
     // test of matmul correctness vs cpu
-    Matrix matmul_test1(128, 64);
+    Tensor matmul_test1(128, 64);
     float *host_buffer1 = new float[128 * 64];
-    Matrix matmul_test2(64, 128);
+    Tensor matmul_test2(64, 128);
     float *host_buffer2 = new float[64 * 128];
 
     // copy to device and fill with random
@@ -81,10 +81,10 @@ int main() {
     // matmul_test1.to_host(host_buffer1);
     // matmul_test2.to_host(host_buffer2);
 
-    for (int i = 0; i < matmul_test1.getcols() * matmul_test1.getrows(); i++) {
+    for (int i = 0; i < matmul_test1.get_shape()[1] * matmul_test1.get_shape()[0]; i++) {
         host_buffer1[i] = dist(gen);
     }
-    for (int i = 0; i < matmul_test2.getcols() * matmul_test2.getrows(); i++) {
+    for (int i = 0; i < matmul_test2.get_shape()[1] * matmul_test2.get_shape()[0]; i++) {
         host_buffer2[i] = dist(gen);
     }
 
@@ -92,7 +92,7 @@ int main() {
     matmul_test1.to_device(host_buffer1);
     matmul_test2.to_device(host_buffer2);
 
-    Matrix matmul_test3 = mat_matmul(matmul_test1, matmul_test2);
+    Tensor matmul_test3 = tensor_matmul(matmul_test1, matmul_test2);
     float *host_buffer3 = new float[128 * 128];
     float *host_ans3 = new float[128 * 128];
     matmul_test3.to_host(host_ans3);
