@@ -10,14 +10,18 @@ namespace minitorch {
 class Tensor {
 
 private:
-    float *data;
+    float *data = nullptr;
     std::vector<int> shape;
     std::vector<int> strides;
-    int total_elems;
+    int total_elems = 0;
 
 public:
     template <typename... Args> Tensor(Args... args) {
         this->shape = {static_cast<int>(args)...};
+        if (this->shape.size() == 0) {
+            this->total_elems = 0;
+            return;
+        }
         // stride of first dim (starting from the back is 1) ie n*c, stride of n is c and stride of
         // c is
         // 1
@@ -50,6 +54,10 @@ public:
     // second constructor which takes vectors
     Tensor(std::vector<int> shape) {
         this->shape = shape;
+        if (this->shape.size() == 0) {
+            this->total_elems = 0;
+            return;
+        }
         // stride of first dim (starting from the back is 1) ie n*c, stride of n is c and stride of
         // c is
         // 1
@@ -78,10 +86,10 @@ public:
     int indexer();
 
     Tensor(Tensor &&other) noexcept;
-    Tensor operator=(Tensor &&other) noexcept;
+    Tensor &operator=(Tensor &&other) noexcept;
     // deleting copy constructor to prevent copy accidents
     Tensor(const Tensor &) = delete;
-    Tensor operator=(const Tensor &) = delete;
+    Tensor &operator=(const Tensor &) = delete;
 
     // overload operators
     Tensor operator+(const Tensor &other) const;
@@ -90,6 +98,7 @@ public:
     Tensor operator*(float scalar) const;
 
     std::vector<int> get_shape() const;
+    int get_size() const;
 
     float *getdata() const;
 
@@ -105,8 +114,8 @@ public:
 
     void to_host(float *buffer) const;
     void to_device(const float *buffer);
-
-
+    void fill(float val);
+    void print() const;
 };
 
 // Non-member functions for Tensor operations

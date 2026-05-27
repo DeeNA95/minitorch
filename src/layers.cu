@@ -3,8 +3,8 @@
 #include "iostream"
 #include "minitorch/activations.cuh"
 #include "minitorch/layers.cuh"
-#include "minitorch/tensor.cuh"
 #include "minitorch/ops.cuh"
+#include "minitorch/tensor.cuh"
 
 using namespace minitorch;
 
@@ -14,8 +14,8 @@ Linear::Linear(int in_features, int out_features)
       bias(1, out_features), grad_weights(in_features, out_features), grad_bias(1, out_features),
       input_cache(1, 1) /* will be overwritten by move op*/ {
 
-    Linear::weights.rand_fill(-0.01f, 0.01f);
-    Linear::bias.rand_fill(-0.01f, 0.01f);
+    Linear::weights.uniform_initialisation(0.01f);
+    Linear::bias.uniform_initialisation(0.01f);
 }
 
 Linear::~Linear() {
@@ -28,8 +28,7 @@ Tensor Linear::forward(const Tensor &inputs /*, std::string act_fn*/) {
     Linear::input_cache = std::move(inputs.copy());
     Tensor weighted = tensor_matmul(inputs, weights);
 
-    Tensor output = Tensor(weighted.get_shape()[0], weighted.get_shape()[1]);
-    b_add(weighted, bias, output);
+    Tensor output = bias_add(weighted, bias);
 
     /*if (act_fn == "relu") {
         relu_forward(output);
@@ -109,5 +108,31 @@ const Tensor &Linear::get_grad_bias() const {
 }
 const Tensor &Linear::get_grad_weights() const {
     return grad_weights;
+}
+
+/* FLATTE */
+
+Flatten::Flatten() {}
+
+Flatten::~Flatten() {}
+
+Tensor Flatten::forward(const Tensor &inputs) {
+    this->input_shape = inputs.get_shape();
+
+    Tensor output = inputs.copy();
+
+    int first_dim = input_shape[0];
+    int second_dim = 1;
+    for (int i = 1; i < input_shape.size(); i++) {
+        second_dim *= input_shape[i];
+    }
+    output.reshape({first_dim, second_dim});
+    return output;
+}
+
+Tensor Flatten::backward(const Tensor &grad_outputs) {
+    Tensor grad_inputs = grad_outputs.copy();
+    grad_inputs.reshape(input_shape);
+    return grad_inputs;
 }
 } // namespace minitorch

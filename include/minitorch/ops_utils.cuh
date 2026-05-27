@@ -2,7 +2,7 @@
 #include "matrix.cuh"
 #include "tensor.cuh"
 #include "cooperative_groups/reduce.h"
-#include <cooperative_groups>
+#include <cooperative_groups.h>
 #define TILE_SIZE 16
 #include "minitorch/utils.cuh"
 
@@ -86,12 +86,15 @@ inline void __device__ dev_dot_product(const float *__restrict__ A, const float 
     //
     // fill the shared mem tiles
     for (int i = 0; i < (b_rows + TILE_SIZE - 1) / TILE_SIZE; i++) {
-        if (i * TILE_SIZE + x_local >= b_rows) {
-            tile_a[y_local][x_local] = 0.0f;
-            tile_b[y_local][x_local] = 0.0f;
-        } else {
+        if (i * TILE_SIZE + x_local < b_rows && y < a_rows) {
             tile_a[y_local][x_local] = A[y * b_rows + (i * TILE_SIZE + x_local)];
+        } else {
+            tile_a[y_local][x_local] = 0.0f;
+        }
+        if (i * TILE_SIZE + y_local < b_rows && x < b_cols) {
             tile_b[y_local][x_local] = B[(i * TILE_SIZE + y_local) * b_cols + x];
+        } else {
+            tile_b[y_local][x_local] = 0.0f;
         }
         __syncthreads();
         // perform the dot product
@@ -106,7 +109,7 @@ inline void __device__ dev_dot_product(const float *__restrict__ A, const float 
     C[y * b_cols + x] = sum;
 }
 
-inline __device__ float dev_sum(const float* __restrict__ start, int reduce_size, int stride, auto warp ){
+inline __device__ float dev_sum(const float* __restrict__ start, int reduce_size, int stride, cg::thread_block_tile<32> warp ){
     float sum = 0.0f;
 
     for (int i = warp.thread_rank(); i < reduce_size; i += warp.size()){

@@ -5,6 +5,7 @@
 #include "minitorch/memory_pool.cuh"
 #include "minitorch/ops.cuh"
 #include "minitorch/ops_utils.cuh"
+#include "minitorch/random.cuh"
 #include "minitorch/tensor.cuh"
 #include "minitorch/utils.cuh"
 
@@ -39,7 +40,7 @@ Tensor::Tensor(Tensor &&other) noexcept
 }
 
 // Move assignment
-Tensor Tensor::operator=(Tensor &&other) noexcept {
+Tensor &Tensor::operator=(Tensor &&other) noexcept {
     if (this != &other) {
         if (data) {
             MemoryPool::instance().deallocate(data, sizeof(float) * total_elems);
@@ -52,7 +53,7 @@ Tensor Tensor::operator=(Tensor &&other) noexcept {
         other.data = nullptr;
         other.total_elems = 0;
     }
-    return std::move(*this);
+    return *this;
 }
 
 // overloads and operations
@@ -122,7 +123,8 @@ Tensor bias_add(const Tensor &A, const Tensor &bias) {
 
     // bias must be 1D with size == number of channels (second dim)
     int n_channels = a_shape[1];
-    assert(bias_shape.size() == 1 && bias_shape[0] == n_channels && "Bias shape must be (channels,)");
+    assert(bias_shape.size() == 1 && bias_shape[0] == n_channels &&
+           "Bias shape must be (channels,)");
 
     Tensor C = Tensor(a_shape);
 
@@ -142,8 +144,8 @@ Tensor bias_add(const Tensor &A, const Tensor &bias) {
     int blocks_x = (spatial_size + threads - 1) / threads;
     dim3 grid(blocks_x, 1, batch_channels);
 
-    tensor_bias_add_kernel<<<grid, threads>>>(A.getdata(), bias.getdata(), C.getdata(),
-                                               n_channels, spatial_size);
+    tensor_bias_add_kernel<<<grid, threads>>>(A.getdata(), bias.getdata(), C.getdata(), n_channels,
+                                              spatial_size);
     return C;
 }
 
@@ -352,17 +354,20 @@ __global__ void tensor_init(float *data, int n_cols, int n_rows, float scale, in
 }
 
 void Tensor::uniform_initialisation(float scale) {
-    // calculates blocks needed for warps
+    if (this->total_elems > 0) {
+        Random_Manager::instance().uniform(this->data, this->total_elems);
+    }
     int n_matrices = 1;
     size_t size = this->shape.size();
-    for (int i = 0; i < size - 2; i++) {
+    if (size == 0)
+        return;
+    int n_cols = this->shape[size - 1];
+    int n_rows = (size >= 2) ? this->shape[size - 2] : 1;
+    for (int i = 0; i < (int)size - 2; i++) {
         n_matrices *= this->shape[i];
     }
-    // using 256 threads per block so 8 warps
     int threads = 256;
-    int blocks = (n_matrices + threads / 32 - 1) /
-                 (threads / 32); // kept programmatic incase of increase in threads
-    int n_cols = this->shape[size - 1], n_rows = this->shape[size - 2];
+    int blocks = (n_matrices + threads / 32 - 1) / (threads / 32);
     tensor_init<<<blocks, threads>>>(this->data, n_cols, n_rows, scale, n_matrices);
 }
 Tensor Tensor::copy() const {
@@ -376,67 +381,69 @@ Tensor Tensor::copy() const {
     return out;
 }
 
-__global__ void sum_reduce(const float* __restrict__ in, float* __restrict__ out, int outer, int inner, int reduce_size){
+__global__ void sum_reduce(const float *__restrict__ in, float *__restrict__ out, int outer,
+                           int inner, int reduce_size) {
     auto grid = cg::this_grid();
     auto block = cg::this_thread_block();
     auto warp = cg::tiled_partition<32>(block);
 
     int global_warp_index = blockIdx.x * warp.meta_group_size() + warp.meta_group_rank();
 
-    if (global_warp_index >= outer*inner) return;
+    if (global_warp_index >= outer * inner)
+        return;
 
     int outer_idx = global_warp_index / inner;
     int inner_idx = global_warp_index % inner;
 
-    const float* in_ptr = in + outer_idx * inner * reduce_size + inner_idx;
-    float* out_ptr = out + outer_idx * inner + inner_idx;
+    const float *in_ptr = in + outer_idx * inner * reduce_size + inner_idx;
+    float *out_ptr = out + outer_idx * inner + inner_idx;
 
     float warp_sum = dev_sum(in_ptr, reduce_size, inner, warp);
 
-    if (warp.thread_rank() == 0){
+    if (warp.thread_rank() == 0) {
         *out_ptr = warp_sum;
     }
 }
 
-Tensor Tensor::sum(int dim, bool keepdim){
-    if (dim < 0){
-        dim = this->shape.size()+dim;
+Tensor Tensor::sum(int dim, bool keepdim) {
+    if (dim < 0) {
+        dim = this->shape.size() + dim;
     }
     int outer = 1;
-    int inner =1;
+    int inner = 1;
     int reduce_size = this->shape[dim];
 
-    for (int i=0 ; i < dim; i++){
+    for (int i = 0; i < dim; i++) {
         outer *= this->shape[i];
     }
-    for (int i=this->shape.size()-1 ; i > dim; i--){
+    for (int i = this->shape.size() - 1; i > dim; i--) {
         inner *= this->shape[i];
     }
 
     std::vector<int> out_shape;
-    if (keepdim){
+    if (keepdim) {
         out_shape = this->shape;
         out_shape[dim] = 1;
     } else {
         out_shape = this->shape;
-        out_shape.erase(out_shape.begin()+dim);
+        out_shape.erase(out_shape.begin() + dim);
     }
 
-
-    if (out_shape.empty()) out_shape = {1};
+    if (out_shape.empty())
+        out_shape = {1};
 
     Tensor out(out_shape);
 
     int threads = 256;
-    int blocks = (outer*inner + threads/32 -1)/(threads/32);
+    int blocks = (outer * inner + threads / 32 - 1) / (threads / 32);
 
     sum_reduce<<<blocks, threads>>>(this->data, out.getdata(), outer, inner, reduce_size);
 
     return out;
-
 }
 
-__global__ void tensor_transpose_kernel(const float *__restrict__ in, float *__restrict__ out, int batch_count, int rows, int cols) {
+__global__ void tensor_transpose_kernel(const float *__restrict__ in, float *__restrict__ out,
+                                        int batch_count, int rows, int cols) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z;
@@ -450,26 +457,29 @@ __global__ void tensor_transpose_kernel(const float *__restrict__ in, float *__r
 
 Tensor tensor_transpose(const Tensor &A) {
     std::vector<int> shape = A.get_shape();
-    if (shape.size() < 2) return A.copy();
-    
+    if (shape.size() < 2)
+        return A.copy();
+
     int rows = shape[shape.size() - 2];
     int cols = shape.back();
-    
+
     std::vector<int> out_shape = shape;
     out_shape[out_shape.size() - 2] = cols;
     out_shape.back() = rows;
-    
+
     Tensor out(out_shape);
-    
+
     int batch_count = 1;
     for (int i = 0; i < shape.size() - 2; i++) {
         batch_count *= shape[i];
     }
-    
+
     dim3 threads(16, 16);
-    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y, batch_count);
-    
-    tensor_transpose_kernel<<<blocks, threads>>>(A.getdata(), out.getdata(), batch_count, rows, cols);
+    dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y,
+                batch_count);
+
+    tensor_transpose_kernel<<<blocks, threads>>>(A.getdata(), out.getdata(), batch_count, rows,
+                                                 cols);
     return out;
 }
 
@@ -479,6 +489,106 @@ void Tensor::to_host(float *buffer) const {
 
 void Tensor::to_device(const float *buffer) {
     cudaMemcpy(this->data, buffer, sizeof(float) * this->total_elems, cudaMemcpyHostToDevice);
+}
+
+__global__ void tensor_fill_kernel(float *data, float val, int total_elems) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < total_elems) {
+        data[i] = val;
+    }
+}
+
+void Tensor::fill(float val) {
+    if (val == 0.0f) {
+        cudaMemset(this->data, 0, sizeof(float) * this->total_elems);
+        return;
+    }
+    int threads = 256;
+    int blocks = (this->total_elems + threads - 1) / threads;
+    tensor_fill_kernel<<<blocks, threads>>>(this->data, val, this->total_elems);
+}
+
+void Tensor::print() const {
+    float *host_data = new float[this->total_elems];
+    this->to_host(host_data);
+
+    std::cout << "Tensor Shape: [";
+    for (size_t i = 0; i < this->shape.size(); i++) {
+        std::cout << this->shape[i] << (i < this->shape.size() - 1 ? ", " : "");
+    }
+    std::cout << "]" << std::endl;
+
+    int ndim = this->shape.size();
+    int limit = std::min(this->total_elems, 1000);
+    int printed = 0;
+
+    if (ndim == 1) {
+        int limit1d = std::min((int)this->shape[0], limit);
+        for (int i = 0; i < limit1d; i++) {
+            std::cout << host_data[i * this->strides[0]] << " ";
+        }
+        std::cout << std::endl;
+        printed = limit1d;
+    } else if (ndim >= 2) {
+        int rows = this->shape[ndim - 2];
+        int cols = this->shape[ndim - 1];
+
+        int num_matrices = 1;
+        for (int i = 0; i < ndim - 2; i++) {
+            num_matrices *= this->shape[i];
+        }
+
+        for (int m = 0; m < num_matrices; m++) {
+            if (printed >= limit)
+                break;
+
+            if (ndim > 2) {
+                std::cout << "Block [";
+                int temp = m;
+                std::vector<int> indices(ndim - 2);
+                for (int i = ndim - 3; i >= 0; i--) {
+                    indices[i] = temp % this->shape[i];
+                    temp /= this->shape[i];
+                }
+                for (int i = 0; i < ndim - 2; i++) {
+                    std::cout << indices[i] << ", ";
+                }
+                std::cout << ":, :]" << std::endl;
+            }
+
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    if (printed >= limit) {
+                        std::cout << "..." << std::endl;
+                        goto end_print;
+                    }
+
+                    int idx = r * this->strides[ndim - 2] + c * this->strides[ndim - 1];
+                    int temp = m;
+                    for (int i = ndim - 3; i >= 0; i--) {
+                        idx += (temp % this->shape[i]) * this->strides[i];
+                        temp /= this->shape[i];
+                    }
+
+                    std::cout << host_data[idx] << "\t";
+                    printed++;
+                }
+                std::cout << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+end_print:
+    if (this->total_elems > limit) {
+        std::cout << "... [" << (this->total_elems - limit) << " more elements]" << std::endl;
+    }
+
+    delete[] host_data;
+}
+
+int Tensor::get_size() const {
+    return this->total_elems;
 }
 
 } // namespace minitorch

@@ -1,9 +1,10 @@
 #pragma once
 #include <cuda_runtime.h>
 #include <string>
-#include "minitorch/tensor.cuh"
+#include <vector>
 #include "minitorch/module.hh"
 #include "minitorch/ops.cuh"
+#include "minitorch/tensor.cuh"
 
 namespace minitorch {
 
@@ -30,4 +31,15 @@ public:
     void fix_weights();
 };
 
+class Flatten : public Module {
+private:
+    std::vector<int> input_shape;
+
+public:
+    Flatten();
+    ~Flatten();
+
+    Tensor forward(const Tensor &inputs);
+    Tensor backward(const Tensor &grad_outputs);
+};
 } // namespace minitorch

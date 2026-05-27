@@ -9,7 +9,7 @@
 namespace minitorch {
 
 class Conv1d : public Module {
-    Tensor input_cache;
+    Tensor col_matrix_cache;
     Tensor weight;
     Tensor bias;
     Tensor grad_weight;
@@ -22,11 +22,12 @@ class Conv1d : public Module {
     int dilation;
     int groups;
     bool bias_bool;
+    std::vector<int> input_shape;
 
 public:
     // out channel is number of filters
     Conv1d(int in_channels, int out_channels, int kernel_size, int stride, int padding,
-               int dilation, int groups, bool bias=false);
+           int dilation, int groups, bool bias = false);
 
     Tensor forward(const Tensor &inputs);
     Tensor backward(const Tensor &gradients_tensor);
