@@ -1,9 +1,9 @@
+#include <cassert>
 #include <cstddef>
 #include <cuda_runtime.h>
 #include <filesystem>
 #include <iostream>
 #include <random>
-#include <cassert>
 #include "minitorch/matrix.cuh"
 #include "minitorch/memory_pool.cuh"
 #include "minitorch/ops.cuh"
@@ -11,7 +11,6 @@
 #include "minitorch/random.cuh"
 #include "minitorch/utils.cuh"
 namespace minitorch {
-
 
 /* KERNELS */
 
@@ -71,22 +70,23 @@ void __global__ matrix_sub(const float *__restrict__ a, const float *__restrict_
 }
 
 void __global__ matrix_scalar_multiplication(const float *__restrict__ a, float b, float *c,
-                                            int n_cols, int n_rows) {
+                                             int n_cols, int n_rows) {
     dev_scalar_mul(a, b, c, n_cols, n_rows);
 }
 
-void __global__ matrix_elementwise_multiplication(const float *__restrict__ a, const float *__restrict__ b, float *c,
-                                            int n_cols, int n_rows) {
+void __global__ matrix_elementwise_multiplication(const float *__restrict__ a,
+                                                  const float *__restrict__ b, float *c, int n_cols,
+                                                  int n_rows) {
     dev_elem_mul(a, b, c, n_cols, n_rows);
 }
 
-void __global__ matrix_multiplication(const float *__restrict__ a, const float *__restrict__ b, float *c,
-                                            int a_rows, int b_rows, int b_cols) {
+void __global__ matrix_multiplication(const float *__restrict__ a, const float *__restrict__ b,
+                                      float *c, int a_rows, int b_rows, int b_cols) {
     dev_dot_product(a, b, c, a_rows, b_rows, b_cols);
 }
 
 void __global__ bias_add_ker(const float *__restrict__ a, const float *__restrict__ b, float *c,
-                         int n_cols, int n_rows) {
+                             int n_cols, int n_rows) {
     dev_bias_add(a, b, c, n_cols, n_rows);
 }
 
@@ -254,7 +254,8 @@ Matrix mat_matmul(const Matrix &A, const Matrix &B) {
     Matrix out(a_rows, b_cols);
     dim3 threads(TILE_SIZE, TILE_SIZE, 1);
     dim3 blocks((b_cols + threads.x - 1) / threads.x, (a_rows + threads.y - 1) / threads.y);
-    matrix_multiplication<<<blocks, threads>>>(A.getdata(), B.getdata(), out.getdata(), a_rows, b_rows, b_cols);
+    matrix_multiplication<<<blocks, threads>>>(A.getdata(), B.getdata(), out.getdata(), a_rows,
+                                               b_rows, b_cols);
     return out;
 }
 
@@ -267,7 +268,8 @@ Matrix Matrix::operator*(float scalar) const {
     Matrix out(rows, cols);
     dim3 threads(16, 16, 1);
     dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
-    matrix_scalar_multiplication<<<blocks, threads>>>(this->data, scalar, out.getdata(), cols, rows);
+    matrix_scalar_multiplication<<<blocks, threads>>>(this->data, scalar, out.getdata(), cols,
+                                                      rows);
     return out;
 }
 
@@ -289,7 +291,8 @@ Matrix Matrix::elem_mul(const Matrix &other) const {
     Matrix out(rows, cols);
     dim3 threads(16, 16, 1);
     dim3 blocks((cols + threads.x - 1) / threads.x, (rows + threads.y - 1) / threads.y);
-    matrix_elementwise_multiplication<<<blocks, threads>>>(this->data, other.getdata(), out.getdata(), cols, rows);
+    matrix_elementwise_multiplication<<<blocks, threads>>>(this->data, other.getdata(),
+                                                           out.getdata(), cols, rows);
     return out;
 }
 

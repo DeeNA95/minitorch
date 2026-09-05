@@ -3,12 +3,5 @@ VM=vast
 DEST=~/minitorch
 #
 sync:
-	rsync -avzP --exclude='.git/' --exclude='build/' --exclude='data/' ./ $(VM):$(DEST)/
-sync3090:
-	rsync -avzP --exclude='.git/' --exclude='build/'  ./ vast-chess:$(DEST)/
-# sync:
-# 	rsync -avzP --rsync-path=/usr/bin/rsync --exclude='.git/' --exclude='build/' ./ $(VM):$(DEST)/
-#
-#
-# sync:
-# 	tar czf - --exclude='.git' --exclude='build' . | ssh $(VM) "mkdir -p $(DEST) && tar xzf - -C $(DEST)"
+	rsync -avzP --exclude='.git/' --exclude='.opencode/' --exclude='build/' --exclude='data/' ./ $(VM):$(DEST)/
+

@@ -93,7 +93,7 @@ Tensor Conv1d::backward(const Tensor &gradients_tensor) { // shaped (batch, out_
     Tensor reshaped_weight = this->weight.copy();
     // does not change layout of tensor in memory so use of tensor_transpose is needed during may
     // mul
-    reshaped_weight.reshape({1,  this->out_channels,this->in_channels * this->kernel_size});
+    reshaped_weight.reshape({1, this->out_channels, this->in_channels * this->kernel_size});
 
     Tensor grad_col_matrix = tensor_transpose(reshaped_weight) *
                              gradients_tensor; // shape batch, in_channels * kernel_size, out_len

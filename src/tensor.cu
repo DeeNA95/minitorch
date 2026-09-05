@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cooperative_groups.h>
+#include <stdexcept>
 #include <vector>
 #include "minitorch/initialisation/init.cuh"
 #include "minitorch/memory_pool.cuh"
@@ -274,6 +275,8 @@ void __global__ tensor_matmul_kernel(const float *__restrict__ A, const float *_
                                      float *C, int batch_count, int a_rows, int b_rows,
                                      int b_cols) {
     int batch_idx = blockIdx.z;
+    // batch calcs, with the way i have setup the kernel grid the each batch is given a different
+    // block in the z so batch 1 is going to occur in x,y,0 index thread block.
 
     // calc offsets
     const float *A_batch = A + batch_idx * a_rows * b_rows; // a_cols == b_rows
@@ -288,22 +291,26 @@ Tensor tensor_matmul(const Tensor &A, const Tensor &B) {
     std::vector<int> a_shape = A.get_shape();
     std::vector<int> b_shape = B.get_shape();
 
+    std::vector<int> out_shape = broadcasted_output(a_shape, b_shape);
+
+    if (out_shape.size() == 0) {
+        throw std::runtime_error("Tensors either non-broadcastable or col/rows do not match");
+    }
+
+    int b_cols = b_shape.back();
     int a_rows = a_shape[a_shape.size() - 2];
     int a_cols = a_shape.back();
     int b_rows = b_shape[b_shape.size() - 2];
-    int b_cols = b_shape.back();
 
     assert(a_cols == b_rows &&
            "Number of columns in matrix A must be equal to number of rows in Matrix B");
 
-    a_shape.back() = b_cols;
+    // int a_batch_size = get_batch_size(a_shape);
+    // int b_batch_size = get_batch_size(b_shape);
 
-    Tensor C = Tensor(a_shape);
+    Tensor C = Tensor(out_shape);
 
-    int batch_count = 1;
-    for (int i = 0; i < a_shape.size() - 2; i++) {
-        batch_count *= a_shape[i];
-    }
+    int batch_count = get_batch_size(out_shape);
 
     dim3 threads(TILE_SIZE, TILE_SIZE, 1);
     dim3 blocks((b_cols + threads.x - 1) / threads.x, (a_rows + threads.y - 1) / threads.y,
